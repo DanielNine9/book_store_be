@@ -49,9 +49,9 @@ func main() {
 	authorHandler := &handlers.AuthorHandler{DB: DB}
 	bookHandler := &handlers.BookHandler{DB: DB}
 	authHandler := &handlers.AuthHandler{DB: DB} // No need for DB in AuthHandler
-
+	userHandler := &handlers.UserHandler{DB: DB} 
 	// Register routes
-	routes.SetupRoutes(r, authorHandler, bookHandler, authHandler)
+	routes.SetupRoutes(r,userHandler, authorHandler, bookHandler, authHandler, )
 
 	// Start the server
 	if err := r.Run(":8080"); err != nil {
