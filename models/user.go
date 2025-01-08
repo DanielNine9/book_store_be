@@ -1,8 +1,10 @@
 package models
 
-// Struct đại diện cho người dùng
+import "github.com/jinzhu/gorm"
+
 type User struct {
-	ID       uint   `json:"id"`
-	Username string `json:"username"`
-	Password string `json:"password"` // Sử dụng mật khẩu hash trong thực tế
+	gorm.Model
+	Username string `json:"username" binding:"required,min=3,max=30"`
+	Password string `json:"password" binding:"required,min=6"`
+	Role string `json:"role"`
 }
