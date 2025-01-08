@@ -76,12 +76,19 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+
 	// Retrieve the user from the database
 	var existingUser models.User
 	if err := h.DB.Where("username = ?", user.Username).First(&existingUser).Error; err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
+
+	if !existingUser.Active {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User account is not active"})
+		return
+	}
+
 
 	// Compare the provided password with the stored (hashed) password
 	if !utils.ComparePasswords(existingUser.Password, user.Password) {
@@ -197,4 +204,47 @@ func (h *AuthHandler) UpdateRole(c *gin.Context) {
 
 	// Return success message
 	c.JSON(http.StatusOK, gin.H{"message": "Role updated successfully"})
+}
+
+// ActivateUser handler for activating a user's account
+func (h *AuthHandler) ActivateUser(c *gin.Context) {
+	var request struct {
+		Username string `json:"username" binding:"required"`
+	}
+
+	// Bind the incoming request JSON to the request struct
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
+		return
+	}
+
+	// Validate the JWT token and extract the user (assuming admin role is required)
+	currentUser, err := h.ValidateToken(c)
+	if err != nil || currentUser.Role != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only admin can activate users"})
+		return
+	}
+
+	// Retrieve the user from the database
+	var user models.User
+	if err := h.DB.Where("username = ?", request.Username).First(&user).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Check if the user is already active
+	if user.Active {
+		c.JSON(http.StatusConflict, gin.H{"error": "User is already active"})
+		return
+	}
+
+	// Update the user's Active status to true
+	user.Active = true
+	if err := h.DB.Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to activate user"})
+		return
+	}
+
+	// Return success message
+	c.JSON(http.StatusOK, gin.H{"message": "User activated successfully"})
 }
