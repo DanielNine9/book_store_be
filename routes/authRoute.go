@@ -2,14 +2,16 @@ package routes
 
 import (
 	"shop-account/handlers"
+	"shop-account/middlewares"
 	"github.com/gin-gonic/gin"
 )
 
-// AuthRoutes đăng ký các route liên quan đến xác thực
 func AuthRoutes(router *gin.Engine, authHandler *handlers.AuthHandler) {
-	// Đăng ký route cho đăng nhập
-	router.POST("/login", authHandler.Login)
+	authGroup := router.Group("/auth")
+	{
+	authGroup.POST("/register", authHandler.Register)
+	authGroup.POST("/login", authHandler.Login)
 
-	// Đăng ký route cho đăng ký người dùng (nếu có)
-	// router.POST("/register", authHandler.Register)
+	authGroup.PUT("/update-role", middlewares.AuthMiddlewareForRole("admin"), authHandler.UpdateRole)
+	}
 }
