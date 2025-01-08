@@ -11,6 +11,7 @@ func AuthRoutes(router *gin.Engine, authHandler *handlers.AuthHandler) {
 	{
 	authGroup.POST("/register", authHandler.Register)
 	authGroup.POST("/login", authHandler.Login)
+	authGroup.POST("/active", authHandler.ActivateUser)
 
 	authGroup.PUT("/update-role", middlewares.AuthMiddlewareForRole("admin"), authHandler.UpdateRole)
 	}
