@@ -287,49 +287,41 @@ func (h *BookHandler) GetBooksNotConcurrently(c *gin.Context) {
 	
 	c.JSON(http.StatusOK, gin.H{"books": books, "authors": authors})
 }
-// Hàm import 1000 sách vào cơ sở dữ liệu
+
+
 func (h *BookHandler) ImportBooks(c *gin.Context) {
-	// Kiểm tra xem tác giả có tồn tại không
 	var author models.Author
 	if err := h.DB.First(&author, 1).Error; err != nil {
-		// Nếu không có tác giả với ID = 1, trả về lỗi
 		c.JSON(http.StatusNotFound, gin.H{"error": "Author not found"})
 		return
 	}
 
-	// Tạo dữ liệu giả cho 1000 sách
 	var books []models.Book
-	for i := 1; i <= 10000; i++ {
+	for i := 1; i <= 100; i++ {
 		book := models.Book{
 			Title:       fmt.Sprintf("Book Title %d", i),
 			Description: fmt.Sprintf("Description for Book %d", i),
-			AuthorID:    author.ID, // Đảm bảo sử dụng ID của tác giả tồn tại
+			AuthorID:    author.ID, 
 		}
 		books = append(books, book)
 	}
 
-	// Log mảng books để kiểm tra
 	log.Printf("Books to import: %+v", books)
 
-	// Kiểm tra mảng books có trống không
 	if len(books) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No books to import"})
 		return
 	}
 
 	
-	// Thêm các sách vào cơ sở dữ liệu
 		for _, book := range books {
 		if err := h.DB.Create(&book).Error; err != nil {
-			// Nếu gặp lỗi khi thêm một cuốn sách, log lỗi và tiếp tục với sách tiếp theo
 			log.Printf("Error importing book: %+v. Error: %v", book, err)
 			continue
 		}
-		// Log thành công cho mỗi cuốn sách
 		log.Printf("Successfully imported book: %+v", book)
 	}
 
-	// Trả về kết quả sau khi import thành công
 	c.JSON(http.StatusOK, gin.H{
 		"message": fmt.Sprintf("Successfully imported %d books", len(books)),
 	})
