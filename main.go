@@ -17,7 +17,8 @@ func init() {
 	var err error
 
 	// Connection string to Aiven PostgreSQL database with SSL
-	serviceURI := "postgres://avnadmin:AVNS_vqxx-jTp62srIABmstw@hotel-dqh20317-8f11.b.aivencloud.com:25696/defaultdb?sslmode=require"
+	// serviceURI := "postgres://avnadmin:AVNS_vqxx-jTp62srIABmstw@hotel-dqh20317-8f11.b.aivencloud.com:25696/defaultdb?sslmode=require"
+	serviceURI := "postgres://postgres:1234@localhost:5432/book_store?sslmode=disable"
 
 	// Open connection to PostgreSQL using GORM
 	DB, err = gorm.Open("postgres", serviceURI)
@@ -32,7 +33,7 @@ func init() {
 		os.Exit(1)
 	}
 
-	if err := DB.AutoMigrate(&models.Author{}, &models.Book{}).Error; err != nil {
+	if err := DB.AutoMigrate(&models.Author{}, &models.Book{}, &models.User{}).Error; err != nil {
 		log.Fatal("Failed to migrate database:", err)
 		os.Exit(1)
 	}
@@ -47,7 +48,7 @@ func main() {
 	// Initialize handlers
 	authorHandler := &handlers.AuthorHandler{DB: DB}
 	bookHandler := &handlers.BookHandler{DB: DB}
-	authHandler := &handlers.AuthHandler{} // No need for DB in AuthHandler
+	authHandler := &handlers.AuthHandler{DB: DB} // No need for DB in AuthHandler
 
 	// Register routes
 	routes.SetupRoutes(r, authorHandler, bookHandler, authHandler)
