@@ -8,4 +8,6 @@ type Book struct {
     Description string `json:"description"`
     AuthorID    uint   `json:"author_id"`
     Author      Author `json:"author"`
+    
+	Active   bool   `json:"active" gorm:"default:false"` 
 }
