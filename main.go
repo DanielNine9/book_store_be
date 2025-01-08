@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	_ "github.com/lib/pq"
+	"github.com/joho/godotenv"
 )
 
 var DB *gorm.DB
@@ -18,8 +19,17 @@ func init() {
 
 	// Connection string to Aiven PostgreSQL database with SSL
 	// serviceURI := "postgres://avnadmin:AVNS_vqxx-jTp62srIABmstw@hotel-dqh20317-8f11.b.aivencloud.com:25696/defaultdb?sslmode=require"
-	serviceURI := "postgres://postgres:1234@localhost:5432/book_store?sslmode=disable"
+	// serviceURI := "postgres://postgres:1234@localhost:5432/book_store?sslmode=disable"
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error loading .env file")
+	}
 
+	serviceURI := os.Getenv("DATABASE_URL")
+	
+	if serviceURI == "" {
+		log.Fatal("DATABASE_URL environment variable is not set")
+		os.Exit(1)
+	}
 	// Open connection to PostgreSQL using GORM
 	DB, err = gorm.Open("postgres", serviceURI)
 	if err != nil {
