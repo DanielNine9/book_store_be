@@ -191,20 +191,29 @@ func (h *BookHandler) PatchBook(c *gin.Context) {
 
 	// Kiểm tra nếu tác giả không hợp lệ (ví dụ: không tồn tại)
 	var author models.Author
-	if err := h.DB.First(&author, updatedBook.AuthorID).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Author not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate author"})
+	if updatedBook.AuthorID != 0 {
+		if err := h.DB.First(&author, updatedBook.AuthorID).Error; err != nil {
+			if gorm.IsRecordNotFoundError(err) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Author not found"})
+			} else {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate author"})
+			}
+			return
 		}
-		return
 	}
+	
 
 	if updatedBook.Title != "" {
 		book.Title = updatedBook.Title
 	}
 	if updatedBook.AuthorID != 0 {
 		book.AuthorID = updatedBook.AuthorID
+	}
+	if updatedBook.Price != 0 {
+		book.Price = updatedBook.Price
+	}
+	if updatedBook.QuantityInStock != 0 {
+		book.QuantityInStock = updatedBook.QuantityInStock
 	}
 
 	if err := h.DB.Save(&book).Error; err != nil {
@@ -225,31 +234,25 @@ type AuthorResult struct {
 	Err     error
 }
 
-// Hàm lấy danh sách sách và tác giả đồng thời (sử dụng concurrency)
 func (h *BookHandler) GetBooksConcurrently(c *gin.Context) {
-	// Tạo hai channel để nhận kết quả từ các goroutines
 	bookResultChan := make(chan BookResult)
 	authorResultChan := make(chan AuthorResult)
 
-	// Goroutine để lấy danh sách sách
 	go func() {
 		var books []models.Book
 		err := h.DB.Preload("Author").Find(&books).Error
-		bookResultChan <- BookResult{Books: books, Err: err} // Gửi kết quả vào channel bookResultChan
+		bookResultChan <- BookResult{Books: books, Err: err} 
 	}()
 
-	// Goroutine để lấy danh sách tác giả
 	go func() {
 		var authors []models.Author
 		err := h.DB.Find(&authors).Error
-		authorResultChan <- AuthorResult{Authors: authors, Err: err} // Gửi kết quả vào channel authorResultChan
+		authorResultChan <- AuthorResult{Authors: authors, Err: err} 
 	}()
 
-	// Chờ và nhận kết quả từ cả hai channel
 	var books []models.Book
 	var authors []models.Author
 
-	// Nhận kết quả từ cả hai channel
 	for i := 0; i < 2; i++ {
 		select {
 		case result := <-bookResultChan:
@@ -257,17 +260,16 @@ func (h *BookHandler) GetBooksConcurrently(c *gin.Context) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to retrieve books: %v", result.Err)})
 				return
 			}
-			books = result.Books // Lưu trữ kết quả sách
+			books = result.Books 
 		case result := <-authorResultChan:
 			if result.Err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to retrieve authors: %v", result.Err)})
 				return
 			}
-			authors = result.Authors // Lưu trữ kết quả tác giả
+			authors = result.Authors 
 		}
 	}
 
-	// Trả về kết quả sau khi đã lấy xong dữ liệu cả sách và tác giả
 	c.JSON(http.StatusOK, gin.H{
 		"books":   books,
 		"authors": authors,
