@@ -19,7 +19,7 @@ type BookHandler struct {
 // Hàm lấy danh sách sách
 func (h *BookHandler) GetBooks(c *gin.Context) {
 	var books []models.Book
-	if err := h.DB.Preload("Author").Find(&books).Error; err != nil {
+	if err := h.DB.Preload("Author").Preload("Category").Find(&books).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve books"})
 		return
 	}
@@ -53,7 +53,7 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
 	}
 
 	book.Active = true
-	if err := h.DB.Create(&book).Error; err != nil {
+	if err := h.DB.Preload("Author").Preload("Category").Create(&book).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create book"})
 		return
 	}
@@ -71,7 +71,7 @@ func (h *BookHandler) GetBookByID(c *gin.Context) {
 	}
 
 	var book models.Book
-	if err := h.DB.Preload("Author").First(&book, bookID).Error; err != nil {
+	if err := h.DB.Preload("Author").Preload("Category").First(&book, bookID).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Book not found"})
 		} else {
