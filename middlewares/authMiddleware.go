@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"github.com/dgrijalva/jwt-go"
-	"fmt"
+	// "fmt"
 )
 
 // Middleware để kiểm tra JWT token
@@ -30,7 +30,7 @@ import (
 				c.Abort()
 				return
 			}
-			fmt.Printf("claims: %s", claims)
+			// fmt.Printf("claims: %s", claims)
 
 			c.Set("username", claims["username"])
 			c.Set("user_id", claims["user_id"])
