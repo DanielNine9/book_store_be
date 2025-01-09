@@ -11,5 +11,7 @@ type Book struct {
     Author         Author  `json:"author"`
     Active         bool    `json:"active" gorm:"default:true"`
     QuantityInStock uint   `json:"quantity_in_stock" gorm:"default:10"` 
-    QuantitySold   uint    `json:"quantity_sold" gorm:"default:0"`    
+    QuantitySold   uint    `json:"quantity_sold" gorm:"default:0"` 
+    Category         Category `json:"category"`   
+    CategoryID       uint    `json:"category_id"` 
 }
