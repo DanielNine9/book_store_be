@@ -326,3 +326,32 @@ func (h *BookHandler) ImportBooks(c *gin.Context) {
 		"message": fmt.Sprintf("Successfully imported %d books", len(books)),
 	})
 }
+
+// Restore function to restore a soft-deleted record
+func (h *BookHandler) Restore(c *gin.Context) {
+    id := c.Param("id")
+    var book models.Book
+
+    // Try to find the deleted book by its ID (including soft-deleted ones)
+    if err := h.DB.Unscoped().Where("id = ?", id).First(&book).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Book not found"})
+        return
+    }
+
+    // Check if the book is already active (not deleted)
+    if book.DeletedAt == nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Book is not deleted"})
+        return
+    }
+
+    // Restore the book by setting DeletedAt to nil
+    if err := h.DB.Model(&book).Update("deleted_at", nil).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to restore book"})
+        return
+    }
+
+    // Return success message
+    c.JSON(http.StatusOK, gin.H{"message": "Book restored successfully"})
+}
+
+
