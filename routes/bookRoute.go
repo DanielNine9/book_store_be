@@ -13,6 +13,7 @@ func BookRoutes(router *gin.Engine, bookHandler *handlers.BookHandler) {
 		bookGroup.GET("/:id", bookHandler.GetBookByID)
 		bookGroup.POST("/", bookHandler.CreateBook)
 		bookGroup.PUT("/:id", bookHandler.UpdateBook)
+		bookGroup.PUT("/restore/:id", bookHandler.Restore)
 		bookGroup.PATCH("/:id", bookHandler.PatchBook)
 		bookGroup.DELETE("/:id", bookHandler.DeleteBook)
 		bookGroup.GET("/concurrency", bookHandler.GetBooksConcurrently) 
