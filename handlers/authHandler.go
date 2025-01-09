@@ -97,7 +97,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// Generate JWT token
-	token, err := generateToken(existingUser.Username, existingUser.Role)
+	token, err := generateToken(existingUser.ID , existingUser.Username, existingUser.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate token"})
 		return
@@ -107,23 +107,22 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
 
-// Function to generate JWT token with role
-func generateToken(username, role string) (string, error) {
-	// Define a secret key for signing the JWT token
+func generateToken(user_id uint, username, role string) (string, error) {
 	secretKey := []byte("your_secret_key")
-
-	// Create a new JWT token
+	fmt.Printf("user_id in generateToken %d", user_id)
+	// the JWT claims require the value to be of type interface{}
+	//  (which can hold various types), the correct approach would be to convert the uint to float64 
+	// before setting it in the JWT claims. This is because JWT claims often store numbers as float64.
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": float64(user_id),
 		"username": username,
 		"role":     role,
 		"exp":      time.Now().Add(time.Hour * 72).Unix(),
 	})
 
-	// Sign and return the token
 	return token.SignedString(secretKey)
 }
 
-// Middleware to validate JWT token and extract user role
 func (h *AuthHandler) ValidateToken(c *gin.Context) (*models.User, error) {
 	// Get the token from the Authorization header
 	authHeader := c.GetHeader("Authorization")
