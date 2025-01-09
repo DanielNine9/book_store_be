@@ -31,16 +31,13 @@ func (h *AdminTransactionHandler) GetAllTransactions(c *gin.Context) {
 	})
 }
 
-// UpdateTransactionStatus allows admins to change the status of a transaction
 func (h *AdminTransactionHandler) UpdateTransactionStatus(c *gin.Context) {
-	// Get transaction ID from URL parameters
 	transactionID := c.Param("id")
 	if transactionID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Transaction ID is required"})
 		return
 	}
 
-	// Get the new status from the request body
 	var requestBody struct {
 		Status models.TransactionStatus `json:"status"`
 	}
@@ -49,7 +46,6 @@ func (h *AdminTransactionHandler) UpdateTransactionStatus(c *gin.Context) {
 		return
 	}
 
-	// Validate that the status is valid
 	validStatuses := []models.TransactionStatus{
 		models.Pending,
 		models.Approved,
