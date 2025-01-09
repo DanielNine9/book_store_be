@@ -5,6 +5,7 @@ import (
 	"os"
 	"shop-account/models"
 	"shop-account/handlers"
+	"shop-account/handlers/admin"
 	"shop-account/routes"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
@@ -43,7 +44,7 @@ func init() {
 		os.Exit(1)
 	}
 
-	if err := DB.AutoMigrate(&models.Author{}, &models.Book{}, &models.User{}, &models.Purchase{}).Error; err != nil {
+	if err := DB.AutoMigrate(&models.Author{}, &models.Book{}, &models.User{}, &models.Purchase{}, &models.Transaction{}).Error; err != nil {
 		log.Fatal("Failed to migrate database:", err)
 		os.Exit(1)
 	}
@@ -55,16 +56,15 @@ func main() {
 	// Initialize Gin router
 	r := gin.Default()
 
-	// Initialize handlers
 	authorHandler := &handlers.AuthorHandler{DB: DB}
 	bookHandler := &handlers.BookHandler{DB: DB}
-	authHandler := &handlers.AuthHandler{DB: DB} // No need for DB in AuthHandler
+	authHandler := &handlers.AuthHandler{DB: DB} 
 	userHandler := &handlers.UserHandler{DB: DB} 
 	purchaseHandler := &handlers.PurchaseHandler{DB: DB} 
-	// Register routes
-	routes.SetupRoutes(r,purchaseHandler, userHandler, authorHandler, bookHandler, authHandler, )
+	transactionHandler := &handlers.TransactionHandler{DB: DB} 
+	transactionAdminHandler := &admin.AdminTransactionHandler{DB: DB} 
+	routes.SetupRoutes(r,transactionAdminHandler,transactionHandler,purchaseHandler, userHandler, authorHandler, bookHandler, authHandler, )
 
-	// Start the server
 	if err := r.Run(":8080"); err != nil {
 		log.Fatal("Server failed to start:", err)
 	}
