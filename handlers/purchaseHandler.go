@@ -47,7 +47,6 @@ func (h *PurchaseHandler) BuyBook(c *gin.Context) {
 		})
 		return
 	}
-	
 
     var user models.User
     if err := h.DB.Where("id = ? AND active = ?", userID, true).First(&user).Error; err != nil {
@@ -60,6 +59,8 @@ func (h *PurchaseHandler) BuyBook(c *gin.Context) {
         UserID:   user.ID,
         BookID:   book.ID,
         Quantity: purchaseRequest.Quantity,
+		BookPrice: book.Price,
+
     }
 
     if err := h.DB.Create(&purchase).Error; err != nil {
@@ -149,7 +150,7 @@ func (h *PurchaseHandler) GetUserPurchases(c *gin.Context) {
     }
 
     var purchases []models.Purchase
-    if err := h.DB.Preload("Book").Preload("User").Where("user_id = ?", userID).Find(&purchases).Error; err != nil {
+    if err := h.DB.Preload("Book").Preload("User").Preload("Transaction").Where("user_id = ?", userID).Find(&purchases).Error; err != nil {
         fmt.Printf("Error fetching purchases for user_id %v: %v\n", userID, err)
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch purchases"})
         return
