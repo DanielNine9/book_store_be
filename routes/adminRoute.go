@@ -9,7 +9,7 @@ import (
 
 func AdminRoutes(router *gin.Engine, adminTransactionHandler *admin.AdminTransactionHandler) {
 	adminGroup := router.Group("/admin")
-    adminGroup.Use(middlewares.AuthMiddleware())
+    adminGroup.Use(middlewares.AuthMiddlewareForRole("admin"))
 
 	{
 		adminGroup.GET("/transactions", adminTransactionHandler.GetAllTransactions)
