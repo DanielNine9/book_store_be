@@ -52,7 +52,7 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
 		return
 	}
 
-	// Tạo sách mới
+	book.Active = true
 	if err := h.DB.Create(&book).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create book"})
 		return
@@ -215,6 +215,8 @@ func (h *BookHandler) PatchBook(c *gin.Context) {
 	if updatedBook.QuantityInStock != 0 {
 		book.QuantityInStock = updatedBook.QuantityInStock
 	}
+		
+	book.Active = updatedBook.Active
 
 	if err := h.DB.Save(&book).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update book"})
