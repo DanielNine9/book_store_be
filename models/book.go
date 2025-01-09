@@ -10,5 +10,5 @@ type Book struct {
     AuthorID    uint    `json:"author_id"`
     Author      Author  `json:"author"`
     
-    Active      bool    `json:"active" gorm:"default:false"`  
+    Active      bool    `json:"active" gorm:"default:true"`  
 }
