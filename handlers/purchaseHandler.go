@@ -14,53 +14,68 @@ import (
 type PurchaseHandler struct {
     DB *gorm.DB
 }
-
 func (h *PurchaseHandler) BuyBook(c *gin.Context) {
     userID, exists := c.Get("user_id")
     if !exists {
         c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
         return
     }
-	var purchaseRequest dtos.PurchaseRequest
+
+    var purchaseRequest dtos.PurchaseRequest
     if err := c.ShouldBindJSON(&purchaseRequest); err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
         return
     }
 
     bookID := c.Param("book_id")
-	id, err := strconv.Atoi(bookID)
-
-
-	if err != nil {
-		fmt.Printf("Error converting bookID: %s, Error: %v\n", bookID, err)
-		c.JSON(http.StatusNotFound, gin.H{"error": "Error "})
+    id, err := strconv.Atoi(bookID)
+    if err != nil {
+        fmt.Printf("Error converting bookID: %s, Error: %v\n", bookID, err)
+        c.JSON(http.StatusNotFound, gin.H{"error": "Error converting book ID"})
         return
-	}
+    }
+
     var book models.Book
     if err := h.DB.Where("id = ? AND active = ?", id, true).First(&book).Error; err != nil {
         c.JSON(http.StatusNotFound, gin.H{"error": "Book not found or inactive"})
         return
     }
+
+    if book.QuantityInStock < purchaseRequest.Quantity {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("Not enough stock available, the quantity that can be chosen is %d", book.QuantityInStock),
+		})
+		return
+	}
 	
-	fmt.Printf("user_id: %s\n", userID)
+
     var user models.User
     if err := h.DB.Where("id = ? AND active = ?", userID, true).First(&user).Error; err != nil {
         c.JSON(http.StatusNotFound, gin.H{"error": "User not found or inactive"})
         return
     }
 
+    // Tạo đơn hàng
     purchase := models.Purchase{
-        UserID: user.ID,
-        BookID: book.ID,
-        User:   user,
-        Book:   book,
-		Quantity: purchaseRequest.Quantity,
+        UserID:   user.ID,
+        BookID:   book.ID,
+        Quantity: purchaseRequest.Quantity,
     }
 
     if err := h.DB.Create(&purchase).Error; err != nil {
-		
-	fmt.Printf("err: %s\n", err)
+        fmt.Printf("Error creating purchase: %v\n", err)
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to purchase book"})
+        return
+    }
+
+    // Cập nhật số lượng sách trong kho và số lượng sách đã bán
+    book.QuantityInStock -= purchaseRequest.Quantity
+    book.QuantitySold += purchaseRequest.Quantity
+
+    // Lưu lại thông tin sách đã được cập nhật
+    if err := h.DB.Save(&book).Error; err != nil {
+        fmt.Printf("Error updating book: %v\n", err)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update book stock"})
         return
     }
 
@@ -69,6 +84,61 @@ func (h *PurchaseHandler) BuyBook(c *gin.Context) {
         "purchase": purchase,
     })
 }
+
+// func (h *PurchaseHandler) BuyBook(c *gin.Context) {
+//     userID, exists := c.Get("user_id")
+//     if !exists {
+//         c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+//         return
+//     }
+// 	var purchaseRequest dtos.PurchaseRequest
+//     if err := c.ShouldBindJSON(&purchaseRequest); err != nil {
+//         c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+//         return
+//     }
+
+//     bookID := c.Param("book_id")
+// 	id, err := strconv.Atoi(bookID)
+
+
+// 	if err != nil {
+// 		fmt.Printf("Error converting bookID: %s, Error: %v\n", bookID, err)
+// 		c.JSON(http.StatusNotFound, gin.H{"error": "Error "})
+//         return
+// 	}
+//     var book models.Book
+//     if err := h.DB.Where("id = ? AND active = ?", id, true).First(&book).Error; err != nil {
+//         c.JSON(http.StatusNotFound, gin.H{"error": "Book not found or inactive"})
+//         return
+//     }
+	
+// 	fmt.Printf("user_id: %s\n", userID)
+//     var user models.User
+//     if err := h.DB.Where("id = ? AND active = ?", userID, true).First(&user).Error; err != nil {
+//         c.JSON(http.StatusNotFound, gin.H{"error": "User not found or inactive"})
+//         return
+//     }
+
+//     purchase := models.Purchase{
+//         UserID: user.ID,
+//         BookID: book.ID,
+//         User:   user,
+//         Book:   book,
+// 		Quantity: purchaseRequest.Quantity,
+//     }
+
+//     if err := h.DB.Create(&purchase).Error; err != nil {
+		
+// 	fmt.Printf("err: %s\n", err)
+//         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to purchase book"})
+//         return
+//     }
+
+//     c.JSON(http.StatusOK, gin.H{
+//         "message": "Book purchased successfully",
+//         "purchase": purchase,
+//     })
+// }
 
 
 func (h *PurchaseHandler) GetUserPurchases(c *gin.Context) {
