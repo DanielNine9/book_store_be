@@ -5,6 +5,7 @@ import (
     "github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	"shop-account/models"
+	"shop-account/utils"
 	"shop-account/dtos"
 	"strconv"
 	"fmt"
@@ -141,51 +142,73 @@ func (h *PurchaseHandler) BuyBook(c *gin.Context) {
 //     })
 // }
 
-
 func (h *PurchaseHandler) GetUserPurchases(c *gin.Context) {
-    userID, exists := c.Get("user_id")
+    // Get the authenticated user ID from context
+    userIDInterface, exists := c.Get("user_id")
     if !exists {
         c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
         return
     }
 
+    // Convert the user ID to uint
+    userIDFloat, ok := userIDInterface.(float64)
+    if !ok {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID type"})
+        return
+    }
+    userID := uint(userIDFloat)
+
+    // Initialize an empty slice to hold purchases
     var purchases []models.Purchase
-    if err := h.DB.Preload("Book").Preload("User").Preload("Transaction").Where("user_id = ?", userID).Find(&purchases).Error; err != nil {
+
+    // Preload related data and filter by user_id
+    query := h.DB.Preload("Book").Preload("User").Preload("Transaction").Where("user_id = ?", userID)
+
+    // Call PaginateAndSearch utility to fetch paginated data with dynamic search (if any)
+    totalItems, page, totalPages, err := utils.PaginateAndSearch(c, query, &models.Purchase{}, &purchases, nil)
+    if err != nil {
         fmt.Printf("Error fetching purchases for user_id %v: %v\n", userID, err)
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch purchases"})
         return
     }
 
+    // If no purchases found, return empty response
     if len(purchases) == 0 {
-        c.JSON(http.StatusOK, gin.H{"message": "No purchases found for this user" ,"purchases": []dtos.PurchaseResponse{}})
+        c.JSON(http.StatusOK, gin.H{"message": "No purchases found for this user", "purchases": []dtos.PurchaseResponse{}})
         return
     }
-	var purchaseResponses []dtos.PurchaseResponse
-	
-	fmt.Printf("purchases details: %+v\n\n\n", purchases)
-	for _, purchase := range purchases {
-		var deletedAt *string
+
+    // Convert the purchases into PurchaseResponse DTOs
+    var purchaseResponses []dtos.PurchaseResponse
+    for _, purchase := range purchases {
+        var deletedAt *string
         if purchase.DeletedAt != nil {
             deletedAtStr := purchase.DeletedAt.Format(time.RFC3339)
             deletedAt = &deletedAtStr
         }
-		fmt.Printf("Book details: %+v\n", purchase.Book)
+
         purchaseResponses = append(purchaseResponses, dtos.PurchaseResponse{
             ID:        purchase.ID,
             CreatedAt: purchase.CreatedAt.Format(time.RFC3339),
             UpdatedAt: purchase.UpdatedAt.Format(time.RFC3339),
-			DeletedAt: deletedAt,
+            DeletedAt: deletedAt,
             UserID:    purchase.UserID,
-            Book:    purchase.Book,
+            Book:      purchase.Book,
             Quantity:  purchase.Quantity,
         })
     }
 
+    // Return the paginated purchases response
     c.JSON(http.StatusOK, gin.H{
         "message":   "User purchases retrieved successfully",
-        "purchases": purchases,
+        "current_page":   page,
+        "total_pages":    totalPages,
+        "total_items":    totalItems,
+        "items_per_page": c.DefaultQuery("limit", "10"),
+        "purchases":      purchaseResponses,
     })
 }
+
 
 func (h *PurchaseHandler) UpdatePurchase(c *gin.Context) {
     userID, exists := c.Get("user_id")
