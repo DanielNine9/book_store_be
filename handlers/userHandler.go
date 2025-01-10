@@ -106,14 +106,17 @@ func (h *UserHandler) Delete(c *gin.Context) {
 
 // List all users
 func (h *UserHandler) List(c *gin.Context) {
+	// Initialize an empty slice to hold the users
 	var users []models.User
 
-	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, h.DB, &models.User{}, &users)
+	// Call PaginateAndSearch utility to fetch paginated data with dynamic search (if any)
+	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, h.DB, &models.User{}, &users, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users", "details": err.Error()})
 		return
 	}
 
+	// Returning the paginated users as a response
 	c.JSON(http.StatusOK, gin.H{
 		"current_page":   page,
 		"total_pages":    totalPages,
