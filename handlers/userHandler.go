@@ -107,9 +107,18 @@ func (h *UserHandler) Delete(c *gin.Context) {
 // List all users
 func (h *UserHandler) List(c *gin.Context) {
 	var users []models.User
-	if err := h.DB.Find(&users).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
+
+	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, h.DB, &models.User{}, &users)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users", "details": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"users": users})
+
+	c.JSON(http.StatusOK, gin.H{
+		"current_page":   page,
+		"total_pages":    totalPages,
+		"total_items":    totalItems,
+		"items_per_page": c.DefaultQuery("limit", "10"),
+		"users":          users,
+	})
 }
