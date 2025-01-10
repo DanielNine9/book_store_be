@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"shop-account/models"
+	"shop-account/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	"net/http"
@@ -16,15 +17,27 @@ type BookHandler struct {
 	DB *gorm.DB
 }
 
-// Hàm lấy danh sách sách
 func (h *BookHandler) GetBooks(c *gin.Context) {
+	// Initialize an empty slice to hold the books
 	var books []models.Book
-	if err := h.DB.Preload("Author").Preload("Category").Find(&books).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve books"})
+
+	// Call PaginateAndSearch utility to fetch paginated data with dynamic search (if any)
+	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, h.DB, &models.Book{}, &books,nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch books", "details": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, books)
+
+	// Returning the paginated books as a response
+	c.JSON(http.StatusOK, gin.H{
+		"current_page":   page,
+		"total_pages":    totalPages,
+		"total_items":    totalItems,
+		"items_per_page": c.DefaultQuery("limit", "10"),
+		"books":          books,
+	})
 }
+
 
 // Hàm tạo sách mới
 func (h *BookHandler) CreateBook(c *gin.Context) {
