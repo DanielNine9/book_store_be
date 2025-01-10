@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	"shop-account/models"
+	"shop-account/utils"
 	"github.com/lib/pq"
 )
 
@@ -132,7 +133,38 @@ func (h *TransactionHandler) DeleteTransaction(c *gin.Context) {
 
 
 
+// func (h *TransactionHandler) GetUserTransactions(c *gin.Context) {
+// 	userIDInterface, exists := c.Get("user_id")
+// 	if !exists {
+// 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+// 		return
+// 	}
+
+// 	userIDFloat, ok := userIDInterface.(float64)
+// 	if !ok {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID type"})
+// 		return
+// 	}
+// 	userID := uint(userIDFloat)
+
+// 	var transactions []models.Transaction
+// 	if err := h.DB.Preload("Purchases").Preload("Purchases.Book").Where("user_id = ?", userID).Find(&transactions).Error; err != nil {
+// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve transactions"})
+// 		return
+// 	}
+
+// 	if len(transactions) == 0 {
+// 		c.JSON(http.StatusOK, gin.H{"message": "No transactions found"})
+// 		return
+// 	}
+
+// 	c.JSON(http.StatusOK, gin.H{
+// 		"transactions": transactions,
+// 	})
+// }
+
 func (h *TransactionHandler) GetUserTransactions(c *gin.Context) {
+	// Get the authenticated user ID from context
 	userIDInterface, exists := c.Get("user_id")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
@@ -146,18 +178,25 @@ func (h *TransactionHandler) GetUserTransactions(c *gin.Context) {
 	}
 	userID := uint(userIDFloat)
 
+	// Initialize an empty slice to hold the transactions
 	var transactions []models.Transaction
-	if err := h.DB.Preload("Purchases").Preload("Purchases.Book").Where("user_id = ?", userID).Find(&transactions).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve transactions"})
+
+	// Create a custom query to filter by user_id
+	customQuery := h.DB.Preload("Purchases").Preload("Purchases.Book").Where("user_id = ?", userID)
+
+	// Call PaginateAndSearch utility to fetch paginated data with custom query and dynamic search
+	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, h.DB, &models.Transaction{}, &transactions, customQuery)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch transactions", "details": err.Error()})
 		return
 	}
 
-	if len(transactions) == 0 {
-		c.JSON(http.StatusOK, gin.H{"message": "No transactions found"})
-		return
-	}
-
+	// Returning the paginated transactions as a response
 	c.JSON(http.StatusOK, gin.H{
-		"transactions": transactions,
+		"current_page":   page,
+		"total_pages":    totalPages,
+		"total_items":    totalItems,
+		"items_per_page": c.DefaultQuery("limit", "10"),
+		"transactions":   transactions,
 	})
 }
