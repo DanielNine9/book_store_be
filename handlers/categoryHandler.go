@@ -64,7 +64,7 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 func (h *CategoryHandler) GetCategories(c *gin.Context) {
 	var categories []models.Category
 
-	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, h.DB, &models.Category{}, &categories)
+	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, h.DB, &models.Category{}, &categories, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories", "details": err.Error()})
 		return
@@ -78,6 +78,7 @@ func (h *CategoryHandler) GetCategories(c *gin.Context) {
 		"categories":     categories,
 	})
 }
+
 
 // GetCategory handles retrieving a category by its ID.
 func (h *CategoryHandler) GetCategory(c *gin.Context) {
