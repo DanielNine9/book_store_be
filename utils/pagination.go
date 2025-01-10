@@ -9,12 +9,14 @@ import (
 	"strconv"
 )
 
-// PaginateAndSearch handles pagination and search for any model
-func PaginateAndSearch(c *gin.Context, db *gorm.DB, model interface{}, result interface{}) (int64, int, int, error) {
+// PaginateAndSearch handles pagination, dynamic search on custom fields, and custom query operators
+func PaginateAndSearch(c *gin.Context, db *gorm.DB, model interface{}, result interface{}, customQuery *gorm.DB) (int64, int, int, error) {
 	// Get pagination parameters from query
 	pageStr := c.DefaultQuery("page", "1")  // Default to page 1 if not provided
 	limitStr := c.DefaultQuery("limit", "10") // Default to limit 10 if not provided
 	search := c.DefaultQuery("search", "")  // Default to empty string if no search query provided
+	searchFields := c.DefaultQuery("search_fields", "") // Fields to search by (comma-separated)
+	searchOperator := c.DefaultQuery("search_operator", "OR") // Operator to combine search conditions
 
 	// Parse page and limit to integers
 	page, err := strconv.Atoi(pageStr)
@@ -33,10 +35,33 @@ func PaginateAndSearch(c *gin.Context, db *gorm.DB, model interface{}, result in
 	// Initialize the query builder
 	query := db.Model(model)
 
-	// Apply search filter if provided (search by name and description for example)
-	if search != "" {
-		search = "%" + strings.ToLower(search) + "%"
-		query = query.Where("LOWER(name) LIKE ? OR LOWER(description) LIKE ?", search, search)
+	// Apply the custom query if provided
+	if customQuery != nil {
+		query = customQuery
+	}
+
+	// Apply dynamic search if search is provided
+	if search != "" && searchFields != "" {
+		// Split search fields into a list
+		fields := strings.Split(searchFields, ",")
+		operator := strings.ToUpper(searchOperator)
+		if operator != "AND" && operator != "OR" {
+			operator = "OR" // Default to OR if an invalid operator is provided
+		}
+
+		// Build the search conditions dynamically
+		var conditions []string
+		var args []interface{}
+		for _, field := range fields {
+			conditions = append(conditions, fmt.Sprintf("LOWER(%s) LIKE ?", field))
+			args = append(args, "%"+strings.ToLower(search)+"%")
+		}
+
+		// Combine the conditions using the specified operator (AND/OR)
+		conditionString := strings.Join(conditions, fmt.Sprintf(" %s ", operator))
+
+		// Apply the dynamic search condition
+		query = query.Where(conditionString, args...)
 	}
 
 	// Get the total number of records (for pagination)
