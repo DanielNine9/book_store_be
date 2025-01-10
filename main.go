@@ -11,34 +11,29 @@ import (
 	"github.com/jinzhu/gorm"
 	_ "github.com/lib/pq"
 	"github.com/joho/godotenv"
+	"github.com/gin-contrib/cors"
 )
 
 var DB *gorm.DB
 
 func init() {
 	var err error
-
-	// Connection string to Aiven PostgreSQL database with SSL
-	// serviceURI := "postgres://avnadmin:AVNS_vqxx-jTp62srIABmstw@hotel-dqh20317-8f11.b.aivencloud.com:25696/defaultdb?sslmode=require"
-	// serviceURI := "postgres://postgres:1234@localhost:5432/book_store?sslmode=disable"
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error loading .env file")
 	}
 
 	serviceURI := os.Getenv("DATABASE_URL")
-	
 	if serviceURI == "" {
 		log.Fatal("DATABASE_URL environment variable is not set")
 		os.Exit(1)
 	}
-	// Open connection to PostgreSQL using GORM
+
 	DB, err = gorm.Open("postgres", serviceURI)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 		os.Exit(1)
 	}
 
-	// Test the connection (this ensures the database is accessible)
 	if err := DB.DB().Ping(); err != nil {
 		log.Fatal("Failed to ping database:", err)
 		os.Exit(1)
@@ -53,19 +48,37 @@ func init() {
 }
 
 func main() {
-	// Initialize Gin router
 	r := gin.Default()
 
+	// Enable CORS with all origins, methods, and headers
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"}, // Allow all origins
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}, // Allow all necessary HTTP methods
+		AllowHeaders:     []string{"Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept"}, // Allow all relevant headers
+		AllowCredentials: true,           // Allow credentials (cookies, authorization)
+		MaxAge:           12 * 3600,     // Cache preflight response for 12 hours
+	}))
+
+	// Log the headers of incoming requests to confirm CORS headers
+	r.Use(func(c *gin.Context) {
+		log.Println("Request Headers:", c.Request.Header)
+		c.Next()
+	})
+
+	// Initialize handlers
 	authorHandler := &handlers.AuthorHandler{DB: DB}
 	bookHandler := &handlers.BookHandler{DB: DB}
-	authHandler := &handlers.AuthHandler{DB: DB} 
-	userHandler := &handlers.UserHandler{DB: DB} 
-	purchaseHandler := &handlers.PurchaseHandler{DB: DB} 
-	transactionHandler := &handlers.TransactionHandler{DB: DB} 
-	transactionAdminHandler := &admin.AdminTransactionHandler{DB: DB} 
+	authHandler := &handlers.AuthHandler{DB: DB}
+	userHandler := &handlers.UserHandler{DB: DB}
+	purchaseHandler := &handlers.PurchaseHandler{DB: DB}
+	transactionHandler := &handlers.TransactionHandler{DB: DB}
+	transactionAdminHandler := &admin.AdminTransactionHandler{DB: DB}
 	categoryHandler := &handlers.CategoryHandler{DB: DB}
-	routes.SetupRoutes(r,categoryHandler,transactionAdminHandler,transactionHandler,purchaseHandler, userHandler, authorHandler, bookHandler, authHandler, )
 
+	// Set up routes
+	routes.SetupRoutes(r, categoryHandler, transactionAdminHandler, transactionHandler, purchaseHandler, userHandler, authorHandler, bookHandler, authHandler)
+
+	// Start the server
 	if err := r.Run(":8080"); err != nil {
 		log.Fatal("Server failed to start:", err)
 	}
