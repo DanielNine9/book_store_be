@@ -6,4 +6,5 @@ type Category struct {
     gorm.Model
     Name        string `json:"name"` 
     Description string `json:"description"`
+    ImageURL    string `json:"image_url"`
 }
