@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	"shop-account/models"
+	"shop-account/utils"
 )
 
 type AdminTransactionHandler struct {
@@ -15,19 +16,20 @@ type AdminTransactionHandler struct {
 func (h *AdminTransactionHandler) GetAllTransactions(c *gin.Context) {
 	var transactions []models.Transaction
 
-	// Retrieve all transactions with related purchases and books
-	if err := h.DB.Preload("Purchases").Preload("Purchases.Book").Find(&transactions).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve transactions"})
+	// Get pagination and search parameters from the query string
+	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, h.DB, &models.Transaction{}, &transactions, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch transactions", "details": err.Error()})
 		return
 	}
 
-	if len(transactions) == 0 {
-		c.JSON(http.StatusOK, gin.H{"message": "No transactions found"})
-		return
-	}
-
+	// Return the paginated transactions along with metadata
 	c.JSON(http.StatusOK, gin.H{
-		"transactions": transactions,
+		"current_page":   page,
+		"total_pages":    totalPages,
+		"total_items":    totalItems,
+		"items_per_page": c.DefaultQuery("limit", "10"),
+		"transactions":   transactions,
 	})
 }
 
