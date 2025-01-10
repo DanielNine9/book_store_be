@@ -16,13 +16,15 @@ import (
 type BookHandler struct {
 	DB *gorm.DB
 }
-
 func (h *BookHandler) GetBooks(c *gin.Context) {
 	// Initialize an empty slice to hold the books
 	var books []models.Book
 
+	// Preload related data (Author and Category) separately
+	query := h.DB.Preload("Author").Preload("Category")
+
 	// Call PaginateAndSearch utility to fetch paginated data with dynamic search (if any)
-	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, h.DB, &models.Book{}, &books,nil)
+	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, query, &models.Book{}, &books, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch books", "details": err.Error()})
 		return
