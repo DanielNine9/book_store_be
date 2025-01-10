@@ -95,21 +95,18 @@ func (h *CategoryHandler) GetCategory(c *gin.Context) {
 }
 
 func (h *CategoryHandler) UpdateCategory(c *gin.Context) {
-	// Get category ID from the URL parameter
 	categoryID := c.Param("id")
 	if categoryID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Category ID is required"})
 		return
 	}
 
-	// Get the request data for updating category
 	var categoryRequest dtos.CategoryRequest
 	if err := c.ShouldBind(&categoryRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
 		return
 	}
 
-	// Find the existing category by ID
 	var categoryData models.Category
 	if err := h.DB.First(&categoryData, categoryID).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
@@ -120,11 +117,9 @@ func (h *CategoryHandler) UpdateCategory(c *gin.Context) {
 		return
 	}
 
-	// Update the category data with the new request data
 	categoryData.Name = categoryRequest.Name
 	categoryData.Description = categoryRequest.Description
 
-	// Check if a new image file is provided and upload it
 	file, err := c.FormFile("image")
 	if err == nil {
 		fileContent, err := file.Open()
@@ -132,28 +127,86 @@ func (h *CategoryHandler) UpdateCategory(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open image file", "details": err.Error()})
 			return
 		}
-		defer fileContent.Close() // Close the file after uploading
+		defer fileContent.Close() 
 
-		// Upload the new image to Cloudinary
 		imageURL, err := utils.UploadImageToCloudinary(fileContent)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image", "details": err.Error()})
 			return
 		}
-		// Print image URL for debugging
 		fmt.Printf("ImageUrl %s \n", imageURL)
-		// Update the ImageURL field of the category
 		categoryData.ImageURL = imageURL
 	}
 
-	// Save the updated category to the database
 	if err := h.DB.Save(&categoryData).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update category", "details": err.Error()})
 		return
 	}
 
-	// Return the updated category in the response
 	c.JSON(http.StatusOK, gin.H{"message": "Category updated successfully", "category": categoryData})
+}
+
+
+func (h *CategoryHandler) PatchCategory(c *gin.Context) {
+    id := c.Param("id")
+    var category models.Category
+
+    if err := h.DB.First(&category, id).Error; err != nil {
+        if gorm.IsRecordNotFoundError(err) {
+            c.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
+        } else {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve category"})
+        }
+        return
+    }
+
+	var categoryRequest dtos.CategoryRequest
+	if err := c.ShouldBind(&categoryRequest); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
+		return
+	}
+
+	var categoryData models.Category
+	if err := h.DB.First(&categoryData, id).Error; err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve category", "details": err.Error()})
+		return
+	}
+
+
+    if categoryRequest.Name != "" {
+        categoryData.Name = categoryRequest.Name
+    }
+    if categoryRequest.Description != "" {
+        categoryData.Description = categoryRequest.Description
+    }
+
+    file, err := c.FormFile("image")
+	if err == nil {
+		fileContent, err := file.Open()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open image file", "details": err.Error()})
+			return
+		}
+		defer fileContent.Close() 
+
+		imageURL, err := utils.UploadImageToCloudinary(fileContent)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image", "details": err.Error()})
+			return
+		}
+		categoryData.ImageURL = imageURL
+	}
+
+    if err := h.DB.Save(&categoryData).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update category"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "Category updated successfully", "category": categoryData})
 }
 
 
@@ -177,38 +230,4 @@ func (h *CategoryHandler) DeleteCategory(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Category deleted successfully"})
-}
-
-func (h *CategoryHandler) PatchCategory(c *gin.Context) {
-	id := c.Param("id")
-	var category models.Category
-	if err := h.DB.First(&category, id).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Category not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve category"})
-		}
-		return
-	}
-
-	var updatedCategory models.Category
-	if err := c.ShouldBindJSON(&updatedCategory); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
-		return
-	}
-
-	// Only update fields that are provided (non-zero values)
-	if updatedCategory.Name != "" {
-		category.Name = updatedCategory.Name
-	}
-	if updatedCategory.Description != "" {
-		category.Description = updatedCategory.Description
-	}
-
-	if err := h.DB.Save(&category).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update category"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Category updated successfully", "category": category})
 }
