@@ -162,7 +162,6 @@ func (h *TransactionHandler) DeleteTransaction(c *gin.Context) {
 // 		"transactions": transactions,
 // 	})
 // }
-
 func (h *TransactionHandler) GetUserTransactions(c *gin.Context) {
 	// Get the authenticated user ID from context
 	userIDInterface, exists := c.Get("user_id")
@@ -184,8 +183,8 @@ func (h *TransactionHandler) GetUserTransactions(c *gin.Context) {
 	// Create a custom query to filter by user_id
 	customQuery := h.DB.Preload("Purchases").Preload("Purchases.Book").Where("user_id = ?", userID)
 
-	// Call PaginateAndSearch utility to fetch paginated data with custom query and dynamic search
-	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, h.DB, &models.Transaction{}, &transactions, customQuery)
+	// Call PaginateAndSearch utility to fetch paginated data with custom query
+	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, customQuery, &models.Transaction{}, &transactions, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch transactions", "details": err.Error()})
 		return
