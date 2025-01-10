@@ -8,8 +8,6 @@ import (
 	"shop-account/utils"
 	"github.com/jinzhu/gorm"
 	"fmt"
-	"strconv"
-	"math"
 	
 )
 
@@ -64,43 +62,20 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 }
 
 func (h *CategoryHandler) GetCategories(c *gin.Context) {
-	pageStr := c.DefaultQuery("page", "1")  
-	limitStr := c.DefaultQuery("limit", "10") 
-
-	page, err := strconv.Atoi(pageStr)
-	if err != nil || page <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid page number"})
-		return
-	}
-
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil || limit <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit"})
-		return
-	}
-
-	offset := (page - 1) * limit
-
-	var totalCategories int64
-	if err := h.DB.Model(&models.Category{}).Count(&totalCategories).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count total categories", "details": err.Error()})
-		return
-	}
-
 	var categories []models.Category
-	if err := h.DB.Limit(limit).Offset(offset).Find(&categories).Error; err != nil {
+
+	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, h.DB, &models.Category{}, &categories)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch categories", "details": err.Error()})
 		return
 	}
 
-	totalPages := int(math.Ceil(float64(totalCategories) / float64(limit)))
-
 	c.JSON(http.StatusOK, gin.H{
-		"current_page": page,
-		"total_pages":  totalPages,
-		"total_items":  totalCategories,
-		"items_per_page": limit,
-		"categories":    categories,
+		"current_page":   page,
+		"total_pages":    totalPages,
+		"total_items":    totalItems,
+		"items_per_page": c.DefaultQuery("limit", "10"),
+		"categories":     categories,
 	})
 }
 
