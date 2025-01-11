@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"shop-account/models"
+	"shop-account/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	"net/http"
 	"strconv"
 	"strings"
+	"fmt"
 )
 
 // Handler struct để lưu trữ db instance
@@ -26,22 +28,46 @@ func (h *AuthorHandler) CreateAuthor(c *gin.Context) {
 	var author models.Author
 	// Bind dữ liệu JSON từ request body
 	if err := c.ShouldBindJSON(&author); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		// Log the detailed error
+		fmt.Printf("Error binding JSON: %s\n", err.Error())
+		// Return detailed error message to client (for development purposes)
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Error binding JSON: %s", err.Error())})
 		return
 	}
 
 	// Kiểm tra nếu name bị bỏ trống
 	if strings.TrimSpace(author.Name) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Author name is required"})
+		errMsg := "Author name is required"
+		// Log the detailed error
+		fmt.Printf("%s\n", errMsg)
+		// Return the detailed error to the client
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
 		return
 	}
+
+	// Generate unique code for the author
+	code, err := utils.GenerateCode(h.DB, &models.Author{})
+	if err != nil {
+		// Log the detailed error from GenerateCode
+		fmt.Printf("Error generating author code: %s\n", err.Error())
+		// Return detailed error message to client (for development purposes)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to generate author code: %s", err.Error())})
+		return
+	}
+	fmt.Printf("%s ", code)
+	// Assign the generated code to the author
+	author.Code = code
 
 	// Tạo tác giả mới
 	if err := h.DB.Create(&author).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create author"})
+		// Log the detailed error from database creation
+		fmt.Printf("Error creating author in DB: %s\n", err.Error())
+		// Return the detailed error to the client
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create author in DB: %s", err.Error())})
 		return
 	}
 
+	// Successfully created the author, return it in the response
 	c.JSON(http.StatusCreated, author)
 }
 
