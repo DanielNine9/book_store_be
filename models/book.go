@@ -12,7 +12,6 @@ type Book struct {
     Active         bool    `json:"active" gorm:"default:true"`
     QuantityInStock uint   `json:"quantity_in_stock" gorm:"default:10"` 
     QuantitySold   uint    `json:"quantity_sold" gorm:"default:0"` 
-    Category         Category `json:"category"`   
-    CategoryID       uint    `json:"category_id"` 
+    Categories     []Category `gorm:"many2many:book_categories;foreignkey:ID;association_foreignkey:ID" json:"categories"`
      Code        string `json:"code"`
 }
