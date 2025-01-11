@@ -29,7 +29,7 @@ func (h *TransactionHandler) CreateTransaction(c *gin.Context) {
 	userID := uint(userIDFloat)
 
 	var purchaseRequest struct {
-		PurchaseIDs []uint `json:"purchase_ids"` 
+		PurchaseIDs []uint `json:"purchase_ids"`
 	}
 
 	if err := c.ShouldBindJSON(&purchaseRequest); err != nil {
@@ -52,19 +52,26 @@ func (h *TransactionHandler) CreateTransaction(c *gin.Context) {
 
 	var totalAmount float64
 	for _, purchase := range purchases {
-		
-	fmt.Printf("Quantity: %f\n", float64(purchase.Quantity))
-	fmt.Printf("BookPrice: %f\n", float64(purchase.BookPrice))
-		totalAmount += float64(purchase.Quantity) * float64(purchase.BookPrice) 
+		fmt.Printf("Quantity: %f\n", float64(purchase.Quantity))
+		fmt.Printf("BookPrice: %f\n", float64(purchase.BookPrice))
+		totalAmount += float64(purchase.Quantity) * float64(purchase.BookPrice)
 	}
 
 	fmt.Printf("totalAmount: %f\n", totalAmount)
 
+	// Generate unique code for the transaction
+	code, err := utils.GenerateCode(h.DB, &models.Transaction{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate transaction code", "details": err.Error()})
+		return
+	}
+
 	transaction := models.Transaction{
-		UserID:      userID,           
-		TotalAmount: totalAmount,     
-		Status:      "pending",        
-		Purchases:   purchases,        
+		UserID:      userID,
+		TotalAmount: totalAmount,
+		Status:      "pending",
+		Purchases:   purchases,
+		Code:        code,  // Add the generated code to the transaction
 	}
 
 	if err := h.DB.Create(&transaction).Error; err != nil {
@@ -73,17 +80,19 @@ func (h *TransactionHandler) CreateTransaction(c *gin.Context) {
 	}
 
 	for i := range purchases {
-        purchases[i].TransactionID = transaction.ID
-        if err := h.DB.Save(&purchases[i]).Error; err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update purchase with transaction ID"})
-            return
-        }
-    }
+		purchases[i].TransactionID = transaction.ID
+		if err := h.DB.Save(&purchases[i]).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update purchase with transaction ID"})
+			return
+		}
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":    "A transaction is created",
+		"message": "A transaction is created",
+		"transaction_code": transaction.Code,  
 	})
 }
+
 func (h *TransactionHandler) DeleteTransaction(c *gin.Context) {
     userIDInterface, exists := c.Get("user_id")
     if !exists {
