@@ -17,7 +17,7 @@ func (h *AdminTransactionHandler) GetAllTransactions(c *gin.Context) {
 	var transactions []models.Transaction
 
 	// Get pagination and search parameters from the query string
-	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, h.DB, &models.Transaction{}, &transactions, nil)
+	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, h.DB.Preload("User").Preload("Purchases"), &models.Transaction{}, &transactions, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch transactions", "details": err.Error()})
 		return
