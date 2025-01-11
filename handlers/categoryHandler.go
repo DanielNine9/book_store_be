@@ -16,10 +16,6 @@ type CategoryHandler struct {
 }
 
 func (h *CategoryHandler) CreateCategory(c *gin.Context) {
-    // var categoryRequest struct {
-    //     Name        string `form:"name"`
-    //     Description string `form:"description"`
-    // }
     var categoryRequest dtos.CategoryRequest
 
     if err := c.ShouldBind(&categoryRequest); err != nil {
@@ -30,6 +26,14 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
     var categoryData models.Category
     categoryData.Name = categoryRequest.Name
     categoryData.Description = categoryRequest.Description
+
+    // Generate unique code for the category
+    code, err := utils.GenerateCode(h.DB, &models.Category{})
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate category code", "details": err.Error()})
+        return
+    }
+    categoryData.Code = code
 
     file, err := c.FormFile("image")
 
@@ -46,7 +50,6 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image", "details": err.Error()})
             return
         }
-		fmt.Printf("ImageUrl %s \n", imageURL)
         categoryData.ImageURL = imageURL
     } else if err != nil && err.Error() != "http: no such file" {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process image", "details": err.Error()})
@@ -60,6 +63,7 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 
     c.JSON(http.StatusOK, gin.H{"message": "Category created successfully", "category": categoryData})
 }
+
 
 func (h *CategoryHandler) GetCategories(c *gin.Context) {
 	var categories []models.Category
