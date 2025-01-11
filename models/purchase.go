@@ -12,4 +12,5 @@ type Purchase struct {
     TransactionID uint   `json:"transaction_id"` 
     BookPrice   float64 `json:"book_price" gorm:"default:1`     
     Transaction Transaction `json:"transaction"`    
+     Code        string `json:"code"`
 }

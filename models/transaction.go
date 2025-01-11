@@ -46,6 +46,7 @@ type Transaction struct {
     TransactionTime time.Time          `json:"transaction_time"`
     Purchases       []Purchase         `json:"purchases"`
     User            User               `json:"user"`
+     Code        string `json:"code"`
 }
 
 func (t *Transaction) BeforeCreate(tx *gorm.DB) (err error) {

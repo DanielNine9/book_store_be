@@ -8,5 +8,5 @@ type Author struct {
     Bio   string `json:"bio"`
     Books []Book `json:"books"`
 	Active   bool   `json:"active" gorm:"default:true"` 
-
+    Code        string `json:"code"`
 }

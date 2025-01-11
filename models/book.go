@@ -14,4 +14,5 @@ type Book struct {
     QuantitySold   uint    `json:"quantity_sold" gorm:"default:0"` 
     Category         Category `json:"category"`   
     CategoryID       uint    `json:"category_id"` 
+     Code        string `json:"code"`
 }

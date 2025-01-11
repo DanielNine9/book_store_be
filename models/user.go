@@ -8,5 +8,6 @@ type User struct {
 	Username string `json:"username" binding:"required,min=3,max=30"`
 	Password string `json:"password" binding:"required,min=6"`
 	Role     string `json:"role"`
-	Active   bool   `json:"active" gorm:"default:false"` 
+	Active   bool   `json:"active" gorm:"default:false"`
+	Code        string `json:"code"` 
 }
