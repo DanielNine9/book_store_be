@@ -43,11 +43,11 @@ func (h *PurchaseHandler) BuyBook(c *gin.Context) {
     }
 
     if book.QuantityInStock < purchaseRequest.Quantity {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": fmt.Sprintf("Not enough stock available, the quantity that can be chosen is %d", book.QuantityInStock),
-		})
-		return
-	}
+        c.JSON(http.StatusBadRequest, gin.H{
+            "error": fmt.Sprintf("Not enough stock available, the quantity that can be chosen is %d", book.QuantityInStock),
+        })
+        return
+    }
 
     var user models.User
     if err := h.DB.Where("id = ? AND active = ?", userID, true).First(&user).Error; err != nil {
@@ -55,14 +55,20 @@ func (h *PurchaseHandler) BuyBook(c *gin.Context) {
         return
     }
 
-    // Tạo đơn hàng
     purchase := models.Purchase{
         UserID:   user.ID,
         BookID:   book.ID,
         Quantity: purchaseRequest.Quantity,
-		BookPrice: book.Price,
-
+        BookPrice: book.Price,
     }
+
+    // Generate unique code for the purchase
+    code, err := utils.GenerateCode(h.DB, &models.Purchase{})
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate purchase code", "details": err.Error()})
+        return
+    }
+    purchase.Code = code
 
     if err := h.DB.Create(&purchase).Error; err != nil {
         fmt.Printf("Error creating purchase: %v\n", err)
@@ -70,11 +76,9 @@ func (h *PurchaseHandler) BuyBook(c *gin.Context) {
         return
     }
 
-    // Cập nhật số lượng sách trong kho và số lượng sách đã bán
     book.QuantityInStock -= purchaseRequest.Quantity
     book.QuantitySold += purchaseRequest.Quantity
 
-    // Lưu lại thông tin sách đã được cập nhật
     if err := h.DB.Save(&book).Error; err != nil {
         fmt.Printf("Error updating book: %v\n", err)
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update book stock"})
@@ -86,6 +90,7 @@ func (h *PurchaseHandler) BuyBook(c *gin.Context) {
         "purchase": purchase,
     })
 }
+
 
 // func (h *PurchaseHandler) BuyBook(c *gin.Context) {
 //     userID, exists := c.Get("user_id")
