@@ -18,10 +18,29 @@ type AuthorHandler struct {
 
 // Hàm lấy danh sách tác giả
 func (h *AuthorHandler) GetAuthors(c *gin.Context) {
+	// Initialize an empty slice to hold the authors
 	var authors []models.Author
-	h.DB.Preload("Books").Find(&authors)
-	c.JSON(http.StatusOK, authors)
+
+	// Preload related data (Books)
+	query := h.DB.Preload("Books")
+
+	// Call PaginateAndSearch utility to fetch paginated data with dynamic search (if any)
+	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, query, &models.Author{}, &authors, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch authors", "details": err.Error()})
+		return
+	}
+
+	// Returning the paginated authors as a response
+	c.JSON(http.StatusOK, gin.H{
+		"current_page":   page,
+		"total_pages":    totalPages,
+		"total_items":    totalItems,
+		"items_per_page": c.DefaultQuery("limit", "10"),
+		"authors":        authors,
+	})
 }
+
 
 // Hàm tạo tác giả mới
 func (h *AuthorHandler) CreateAuthor(c *gin.Context) {
