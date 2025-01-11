@@ -22,7 +22,7 @@ func (h *BookHandler) GetBooks(c *gin.Context) {
 	var books []models.Book
 
 	// Preload related data (Author and Category) separately
-	query := h.DB.Preload("Author").Preload("Category")
+	query := h.DB.Preload("Author").Preload("Categories")
 
 	// Call PaginateAndSearch utility to fetch paginated data with dynamic search (if any)
 	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, query, &models.Book{}, &books, nil)
@@ -41,50 +41,90 @@ func (h *BookHandler) GetBooks(c *gin.Context) {
 	})
 }
 
-
-// Hàm tạo sách mới
 func (h *BookHandler) CreateBook(c *gin.Context) {
-	var book models.Book
-	if err := c.ShouldBindJSON(&book); err != nil {
-		fmt.Printf("Error binding JSON: %s\n", err.Error())
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Error binding JSON: %s", err.Error())})
-		return
-	}
+    var requestData struct {
+        Title       string   `json:"title"`
+        Description string   `json:"description"`
+        AuthorID    uint     `json:"author_id"`
+        CategoryIDs []uint   `json:"categories"` // category IDs passed in the request
+    }
 
-	if strings.TrimSpace(book.Title) == "" {
-		errMsg := "Book title is required"
-		fmt.Printf("%s\n", errMsg)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
-		return
-	}
+    // Bind the incoming JSON request to the struct
+    if err := c.ShouldBindJSON(&requestData); err != nil {
+        fmt.Printf("Error binding JSON: %s\n", err.Error())
+        c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Error binding JSON: %s", err.Error())})
+        return
+    }
 
-	var author models.Author
-	if err := h.DB.First(&author, book.AuthorID).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Author not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate author"})
-		}
-		return
-	}
+    // Check if the book title is provided
+    if strings.TrimSpace(requestData.Title) == "" {
+        errMsg := "Book title is required"
+        fmt.Printf("%s\n", errMsg)
+        c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
+        return
+    }
 
-	code, err := utils.GenerateCode(h.DB, &models.Book{})
-	if err != nil {
-		fmt.Printf("Error generating book code: %s\n", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to generate book code: %s", err.Error())})
-		return
-	}
+    // Validate that the author exists
+    var author models.Author
+    if err := h.DB.First(&author, requestData.AuthorID).Error; err != nil {
+        if gorm.IsRecordNotFoundError(err) {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Author not found"})
+        } else {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate author"})
+        }
+        return
+    }
 
-	book.Code = code
-	book.Active = true
-	if err := h.DB.Preload("Author").Preload("Category").Create(&book).Error; err != nil {
-		fmt.Printf("Error creating book in DB: %s\n", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create book in DB: %s", err.Error())})
-		return
-	}
+    // Generate a unique book code
+    code, err := utils.GenerateCode(h.DB, &models.Book{})
+    if err != nil {
+        fmt.Printf("Error generating book code: %s\n", err.Error())
+        c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to generate book code: %s", err.Error())})
+        return
+    }
 
-	c.JSON(http.StatusCreated, book)
+    // Initialize the book object
+    book := models.Book{
+        Title:       requestData.Title,
+        Description: requestData.Description,
+        AuthorID:    requestData.AuthorID,
+        Code:        code,
+        Active:      true,
+    }
+
+    // Handle categories: check if CategoryIDs is not empty
+    if len(requestData.CategoryIDs) > 0 {
+        // Fetch categories from the database based on the category IDs
+        var categories []models.Category
+        if err := h.DB.Find(&categories, "id IN (?)", requestData.CategoryIDs).Error; err != nil {
+            fmt.Printf("Error finding categories: %s\n", err.Error())
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find categories"})
+            return
+        }
+
+        // Assign the categories to the book
+        book.Categories = categories
+    } else {
+        // If no categories are provided, return an error
+        errMsg := "At least one category is required"
+        fmt.Printf("%s\n", errMsg)
+        c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
+        return
+    }
+
+    // Create the book and associated categories
+    if err := h.DB.Preload("Author").Preload("Categories").Create(&book).Error; err != nil {
+        fmt.Printf("Error creating book in DB: %s\n", err.Error())
+        c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create book in DB: %s", err.Error())})
+        return
+    }
+
+    // Respond with the created book
+    c.JSON(http.StatusCreated, book)
 }
+
+
+
 
 
 // Hàm lấy thông tin sách theo ID
