@@ -39,7 +39,7 @@ func init() {
 		os.Exit(1)
 	}
 
-	if err := DB.AutoMigrate(&models.Category{}, &models.Author{}, &models.Book{}, &models.User{}, &models.Purchase{}, &models.Transaction{}).Error; err != nil {
+	if err := DB.AutoMigrate(&models.BookCategory{}, &models.Category{}, &models.Author{}, &models.Book{}, &models.User{}, &models.Purchase{}, &models.Transaction{}).Error; err != nil {
 		log.Fatal("Failed to migrate database:", err)
 		os.Exit(1)
 	}
