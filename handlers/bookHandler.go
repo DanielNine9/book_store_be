@@ -16,6 +16,7 @@ import (
 type BookHandler struct {
 	DB *gorm.DB
 }
+
 func (h *BookHandler) GetBooks(c *gin.Context) {
 	// Initialize an empty slice to hold the books
 	var books []models.Book
@@ -44,19 +45,19 @@ func (h *BookHandler) GetBooks(c *gin.Context) {
 // Hàm tạo sách mới
 func (h *BookHandler) CreateBook(c *gin.Context) {
 	var book models.Book
-	// Bind dữ liệu JSON từ request body
 	if err := c.ShouldBindJSON(&book); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data", "details": err.Error()})
+		fmt.Printf("Error binding JSON: %s\n", err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Error binding JSON: %s", err.Error())})
 		return
 	}
 
-	// Kiểm tra nếu tên sách bị bỏ trống
 	if strings.TrimSpace(book.Title) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Book title is required"})
+		errMsg := "Book title is required"
+		fmt.Printf("%s\n", errMsg)
+		c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
 		return
 	}
 
-	// Kiểm tra nếu tác giả không hợp lệ (ví dụ: không tồn tại)
 	var author models.Author
 	if err := h.DB.First(&author, book.AuthorID).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
@@ -67,14 +68,24 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
 		return
 	}
 
+	code, err := utils.GenerateCode(h.DB, &models.Book{})
+	if err != nil {
+		fmt.Printf("Error generating book code: %s\n", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to generate book code: %s", err.Error())})
+		return
+	}
+
+	book.Code = code
 	book.Active = true
 	if err := h.DB.Preload("Author").Preload("Category").Create(&book).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create book"})
+		fmt.Printf("Error creating book in DB: %s\n", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create book in DB: %s", err.Error())})
 		return
 	}
 
 	c.JSON(http.StatusCreated, book)
 }
+
 
 // Hàm lấy thông tin sách theo ID
 func (h *BookHandler) GetBookByID(c *gin.Context) {
