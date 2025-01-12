@@ -230,7 +230,11 @@ func (h *BookHandler) UpdateBook(c *gin.Context) {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find categories"})
             return
         }
-
+		// if err := h.DB.Model(&book).Association("Categories").Append(categories); err != nil {
+        //     fmt.Printf("Error updating categories: %v\n", err)
+        //     c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update categories"})
+        //     return
+        // }
         // Insert new relationships into the book_categories join table
         for _, category := range categories {
             bookCategory := models.BookCategory{
