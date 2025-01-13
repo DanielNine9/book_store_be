@@ -65,19 +65,15 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "User registered successfully"})
 }
 
-
 // Login handler for user login
 func (h *AuthHandler) Login(c *gin.Context) {
 	var user models.User
 
-	// Bind JSON input to user model
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input"})
 		return
 	}
 
-
-	// Retrieve the user from the database
 	var existingUser models.User
 	if err := h.DB.Where("username = ?", user.Username).First(&existingUser).Error; err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
@@ -89,23 +85,27 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-
-	// Compare the provided password with the stored (hashed) password
 	if !utils.ComparePasswords(existingUser.Password, user.Password) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
-	// Generate JWT token
-	token, err := generateToken(existingUser.ID , existingUser.Username, existingUser.Role)
+	token, err := generateToken(existingUser.ID, existingUser.Username, existingUser.Role)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate token"})
 		return
 	}
 
-	// Return the token
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	c.JSON(http.StatusOK, gin.H{
+		"token":    token,
+		"id":       existingUser.ID,
+		"username": existingUser.Username,
+		// "email":    existingUser.Email,  // Include the email if necessary
+		"role":     existingUser.Role,
+		"active":   existingUser.Active, // Include active status if needed
+	})
 }
+
 
 func generateToken(user_id uint, username, role string) (string, error) {
 	secretKey := []byte("your_secret_key")
