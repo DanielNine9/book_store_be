@@ -39,7 +39,7 @@ func init() {
 		os.Exit(1)
 	}
 
-	if err := DB.AutoMigrate(&models.BookCategory{}, &models.Category{}, &models.Author{}, &models.Book{}, &models.User{}, &models.Purchase{}, &models.Transaction{}).Error; err != nil {
+	if err := DB.AutoMigrate(&models.FavoriteBook{},&models.BookCategory{}, &models.Category{}, &models.Author{}, &models.Book{}, &models.User{}, &models.Purchase{}, &models.Transaction{}).Error; err != nil {
 		log.Fatal("Failed to migrate database:", err)
 		os.Exit(1)
 	}
@@ -74,9 +74,10 @@ func main() {
 	transactionHandler := &handlers.TransactionHandler{DB: DB}
 	transactionAdminHandler := &admin.AdminTransactionHandler{DB: DB}
 	categoryHandler := &handlers.CategoryHandler{DB: DB}
+	favoriteHandler := &handlers.FavoriteBookHandler{DB: DB}
 
 	// Set up routes
-	routes.SetupRoutes(r, categoryHandler, transactionAdminHandler, transactionHandler, purchaseHandler, userHandler, authorHandler, bookHandler, authHandler)
+	routes.SetupRoutes(r, favoriteHandler, categoryHandler, transactionAdminHandler, transactionHandler, purchaseHandler, userHandler, authorHandler, bookHandler, authHandler)
 
 	// Start the server
 	if err := r.Run(":8080"); err != nil {
