@@ -406,18 +406,18 @@ func (h *BookHandler) UpdateBook(c *gin.Context) {
     }
 
     // Xóa các thể loại cũ (nếu có)
-    if err := h.DB.Where("book_id = ?", book.ID).Delete(&models.BookCategory{}).Error; err != nil {
+    if err := h.DB.Unscoped().Where("book_id = ?", book.ID).Delete(&models.BookCategory{}).Error; err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to manually clear categories"})
         return
     }
 
     // Xóa BookDetail và các hình ảnh cũ
-    if err := h.DB.Where("book_id = ?", book.ID).Delete(&models.BookDetail{}).Error; err != nil {
+    if err := h.DB.Unscoped().Where("book_id = ?", book.ID).Delete(&models.BookDetail{}).Error; err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete old BookDetail"})
         return
     }
 
-    if err := h.DB.Where("book_id = ?", book.ID).Delete(&models.BookImage{}).Error; err != nil {
+    if err := h.DB.Unscoped().Where("book_id = ?", book.ID).Delete(&models.BookImage{}).Error; err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete old images"})
         return
     }
