@@ -136,20 +136,26 @@ func (h *BookHandler) GetBooks(c *gin.Context) {
 }
 
 
-
-
 func (h *BookHandler) CreateBook(c *gin.Context) {
     var requestData struct {
-        Title       string   `json:"title"`
-		Price       uint   `json:"price"`
-		QuantityInStock       uint   `json:"quantity"`
-        Description string   `json:"description"`
-        AuthorID    uint     `json:"author_id"`
-        CategoryIDs []uint   `json:"categories"`
+        Title           string   `form:"title"`
+        Price           uint     `form:"price"`
+        QuantityInStock uint     `form:"quantity"`
+        Description     string   `form:"description"`
+        AuthorID        uint     `form:"author_id"`
+        CategoryIDs     []uint   `form:"categories"`
+
+        // Các trường bổ sung từ model
+        Publisher       string   `form:"publisher"`
+        PublicationYear int      `form:"publication_year"`
+        Weight          float64  `form:"weight"`
+        Dimensions      string   `form:"dimensions"`
+        Pages           int      `form:"pages"`
+        BindingType     string   `form:"binding_type"`
     }
 
-    if err := c.ShouldBindJSON(&requestData); err != nil {
-        fmt.Printf("Error binding JSON: %s\n", err.Error())
+    if err := c.ShouldBind(&requestData); err != nil {
+        fmt.Printf("Error binding: %s\n", err.Error())
         c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Error binding JSON: %s", err.Error())})
         return
     }
@@ -178,16 +184,26 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
         return
     }
 
+    // Tạo đối tượng book với tất cả các trường bổ sung
     book := models.Book{
-        Title:       requestData.Title,
-        Description: requestData.Description,
-        AuthorID:    requestData.AuthorID,
-        Price:    float64(requestData.Price),
-        QuantityInStock:    requestData.QuantityInStock,
-        Code:        code,
-        Active:      true,
+        Title:           requestData.Title,
+        Description:     requestData.Description,
+        AuthorID:        requestData.AuthorID,
+        Price:           float64(requestData.Price),
+        QuantityInStock: requestData.QuantityInStock,
+        Code:            code,
+        Active:          true,
+
+        // Lưu các trường bổ sung
+        Publisher:       requestData.Publisher,
+        PublicationYear: requestData.PublicationYear,
+        Weight:          requestData.Weight,
+        Dimensions:      requestData.Dimensions,
+        Pages:           requestData.Pages,
+        BindingType:     requestData.BindingType,
     }
 
+    // Xử lý Category
     if len(requestData.CategoryIDs) > 0 {
         var categories []models.Category
         if err := h.DB.Find(&categories, "id IN (?)", requestData.CategoryIDs).Error; err != nil {
@@ -204,14 +220,56 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
         return
     }
 
+    // Xử lý ảnh
+    var imageURLs []string
+    form, err := c.MultipartForm()
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to process multipart form"})
+        return
+    }
+
+    files := form.File["images"]
+    for _, file := range files {
+        fileContent, err := file.Open()
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open image file", "details": err.Error()})
+            return
+        }
+        defer fileContent.Close()
+
+        // Upload ảnh lên Cloudinary
+        imageURL, err := utils.UploadImageToCloudinary(fileContent)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image", "details": err.Error()})
+            return
+        }
+
+        imageURLs = append(imageURLs, imageURL)
+    }
+
+    // Lưu Book vào cơ sở dữ liệu
     if err := h.DB.Preload("Author").Preload("Categories").Create(&book).Error; err != nil {
         fmt.Printf("Error creating book in DB: %s\n", err.Error())
         c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create book in DB: %s", err.Error())})
         return
     }
 
-    c.JSON(http.StatusCreated, book)
+    // Lưu tất cả hình ảnh cho sách
+    for _, url := range imageURLs {
+        image := models.BookImage{
+            URL:    url,
+            BookID: book.ID,
+        }
+        if err := h.DB.Create(&image).Error; err != nil {
+            fmt.Printf("Error saving image: %s\n", err.Error())
+            c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to save image: %s", err.Error())})
+            return
+        }
+    }
+
+    c.JSON(http.StatusCreated, gin.H{"book": book, "images": imageURLs})
 }
+
 func (h *BookHandler) GetBookByID(c *gin.Context) {
 	id := c.Param("id")
 	bookID, err := strconv.Atoi(id)
