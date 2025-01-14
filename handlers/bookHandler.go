@@ -46,7 +46,7 @@ func (h *BookHandler) GetBooks(c *gin.Context) {
 	var books []models.Book
 
 	// Query to preload related Author and Categories
-	query := h.DB.Preload("Author").Preload("Categories")
+	query := h.DB.Preload("Author").Preload("Categories").Preload("BookDetail").Preload("Images")
 
 	// Paginate and search
 	totalItems, page, totalPages, err := utils.PaginateAndSearch(c, query, &models.Book{}, &books, nil)
@@ -69,7 +69,11 @@ func (h *BookHandler) GetBooks(c *gin.Context) {
 				Description: book.Description,
 				Price:       book.Price,
 				Author:      book.Author,
+				QuantityInStock:   book.QuantityInStock,
+				QuantitySold:      book.QuantitySold,
 				Categories:  book.Categories,
+				BookDetail:  book.BookDetail,
+				Active: book.Active,
 				IsFavorite:  false,
 				IdFavorite:  0,
 			})
@@ -117,6 +121,10 @@ func (h *BookHandler) GetBooks(c *gin.Context) {
 			Price:       book.Price,
 			Author:      book.Author,
 			Categories:  book.Categories,
+			BookDetail:  book.BookDetail,
+			Active: book.Active,
+			QuantityInStock:   book.QuantityInStock,
+			QuantitySold:      book.QuantitySold,
 			IsFavorite:  isFavorite,
 			IdFavorite:  favoriteIDValue, // Set the ID of the favorite (or 0 if not found)
 		}
@@ -135,28 +143,27 @@ func (h *BookHandler) GetBooks(c *gin.Context) {
 	})
 }
 
-
 func (h *BookHandler) CreateBook(c *gin.Context) {
     var requestData struct {
-        Title           string   `form:"title"`
-        Price           uint     `form:"price"`
-        QuantityInStock uint     `form:"quantity"`
-        Description     string   `form:"description"`
-        AuthorID        uint     `form:"author_id"`
-        CategoryIDs     []uint   `form:"categories"`
+        Title           string   `form:"title"`                // Tên sách
+        Price           uint     `form:"price"`                // Giá sách
+        QuantityInStock uint     `form:"quantity"`             // Số lượng còn lại
+        Description     string   `form:"description"`          // Mô tả sách
+        AuthorID        uint     `form:"author_id"`            // ID tác giả
+        CategoryIDs     []uint   `form:"categories"`           // Các thể loại sách
 
         // Các trường bổ sung từ model
-        Publisher       string   `form:"publisher"`
-        PublicationYear int      `form:"publication_year"`
-        Weight          float64  `form:"weight"`
-        Dimensions      string   `form:"dimensions"`
-        Pages           int      `form:"pages"`
-        BindingType     string   `form:"binding_type"`
+        Publisher       string   `form:"publisher"`            // Nhà xuất bản
+        PublicationYear int      `form:"publication_year"`     // Năm xuất bản
+        Weight          float64  `form:"weight"`               // Trọng lượng
+        Dimensions      string   `form:"dimensions"`           // Kích thước
+        Pages           int      `form:"pages"`                // Số trang
+        BindingType     string   `form:"binding_type"`         // Loại bìa sách
     }
 
     if err := c.ShouldBind(&requestData); err != nil {
         fmt.Printf("Error binding: %s\n", err.Error())
-        c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Error binding JSON: %s", err.Error())})
+        c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Error binding: %s", err.Error())})
         return
     }
 
@@ -170,13 +177,14 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
     var author models.Author
     if err := h.DB.First(&author, requestData.AuthorID).Error; err != nil {
         if gorm.IsRecordNotFoundError(err) {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Author not found"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Author with ID %d not found", requestData.AuthorID)})
         } else {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate author"})
         }
         return
     }
 
+    // Tạo mã sách (code)
     code, err := utils.GenerateCode(h.DB, &models.Book{})
     if err != nil {
         fmt.Printf("Error generating book code: %s\n", err.Error())
@@ -184,7 +192,7 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
         return
     }
 
-    // Tạo đối tượng book với tất cả các trường bổ sung
+    // Tạo đối tượng Book với các trường cơ bản
     book := models.Book{
         Title:           requestData.Title,
         Description:     requestData.Description,
@@ -193,17 +201,9 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
         QuantityInStock: requestData.QuantityInStock,
         Code:            code,
         Active:          true,
-
-        // Lưu các trường bổ sung
-        Publisher:       requestData.Publisher,
-        PublicationYear: requestData.PublicationYear,
-        Weight:          requestData.Weight,
-        Dimensions:      requestData.Dimensions,
-        Pages:           requestData.Pages,
-        BindingType:     requestData.BindingType,
     }
 
-    // Xử lý Category
+    // Xử lý các thể loại sách
     if len(requestData.CategoryIDs) > 0 {
         var categories []models.Category
         if err := h.DB.Find(&categories, "id IN (?)", requestData.CategoryIDs).Error; err != nil {
@@ -211,7 +211,6 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find categories"})
             return
         }
-
         book.Categories = categories
     } else {
         errMsg := "At least one category is required"
@@ -220,7 +219,32 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
         return
     }
 
-    // Xử lý ảnh
+    // Tạo BookDetail
+    bookDetail := models.BookDetail{
+        Publisher:       requestData.Publisher,
+        PublicationYear: requestData.PublicationYear,
+        Weight:          requestData.Weight,
+        Dimensions:      requestData.Dimensions,
+        Pages:           requestData.Pages,
+        BindingType:     requestData.BindingType,
+    }
+
+    // Lưu đối tượng Book vào cơ sở dữ liệu
+    if err := h.DB.Create(&book).Error; err != nil {
+        fmt.Printf("Error creating book in DB: %s\n", err.Error())
+        c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create book in DB: %s", err.Error())})
+        return
+    }
+
+    // Lưu BookDetail
+    bookDetail.BookID = book.ID
+    if err := h.DB.Create(&bookDetail).Error; err != nil {
+        fmt.Printf("Error saving book detail: %s\n", err.Error())
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save book detail"})
+        return
+    }
+
+    // Xử lý hình ảnh
     var imageURLs []string
     form, err := c.MultipartForm()
     if err != nil {
@@ -247,14 +271,7 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
         imageURLs = append(imageURLs, imageURL)
     }
 
-    // Lưu Book vào cơ sở dữ liệu
-    if err := h.DB.Preload("Author").Preload("Categories").Create(&book).Error; err != nil {
-        fmt.Printf("Error creating book in DB: %s\n", err.Error())
-        c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create book in DB: %s", err.Error())})
-        return
-    }
-
-    // Lưu tất cả hình ảnh cho sách
+    // Lưu tất cả hình ảnh cho sách vào cơ sở dữ liệu
     for _, url := range imageURLs {
         image := models.BookImage{
             URL:    url,
@@ -267,8 +284,10 @@ func (h *BookHandler) CreateBook(c *gin.Context) {
         }
     }
 
+    // Trả về thông tin sách đã tạo cùng các hình ảnh
     c.JSON(http.StatusCreated, gin.H{"book": book, "images": imageURLs})
 }
+
 
 func (h *BookHandler) GetBookByID(c *gin.Context) {
 	id := c.Param("id")
@@ -279,7 +298,7 @@ func (h *BookHandler) GetBookByID(c *gin.Context) {
 	}
 
 	var book models.Book
-	if err := h.DB.Preload("Author").Preload("Categories").First(&book, bookID).Error; err != nil {
+	if err := h.DB.Preload("BookDetail").Preload("Images").Preload("Author").Preload("Categories").First(&book, bookID).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Book not found"})
 		} else {
@@ -287,7 +306,7 @@ func (h *BookHandler) GetBookByID(c *gin.Context) {
 		}
 		return
 	}
-
+	fmt.Printf("%v ",book)
 	// Retrieve userID from context
 	userID, exists := c.Get("id")
 	var isFavorite bool
@@ -316,23 +335,32 @@ func (h *BookHandler) GetBookByID(c *gin.Context) {
 		Price:       book.Price,
 		Author:      book.Author,
 		Categories:  book.Categories,
+		BookDetail:  book.BookDetail,
+		Images:  book.Images,
 		IsFavorite:  isFavorite,
 		IdFavorite:  favoriteID, // The ID of the favorite or 0 if not a favorite
 	}
 
-	// Return the response
-	c.JSON(http.StatusOK, bookResponse)
-}
+	fmt.Printf("%v" , bookResponse)
 
+	// Return the response
+	c.JSON(http.StatusOK, book)
+}
 
 func (h *BookHandler) UpdateBook(c *gin.Context) {
     var requestData struct {
-        Title            string   `json:"title"`
-        Price            uint     `json:"price"`
-        QuantityInStock  uint     `json:"quantity"`
-        Description      string   `json:"description"`
-        AuthorID         uint     `json:"author_id"`
-        CategoryIDs      []uint   `json:"categories"` 
+        Title            string   `form:"title"`
+        Price            uint     `form:"price"`
+        QuantityInStock  uint     `form:"quantity"`
+        Description      string   `form:"description"`
+        AuthorID         uint     `form:"author_id"`
+        CategoryIDs      []uint   `form:"categories"`
+        Publisher        string   `form:"publisher"`
+        PublicationYear  int      `form:"publication_year"`
+        Weight           float64  `form:"weight"`
+        Dimensions       string   `form:"dimensions"`
+        Pages            int      `form:"pages"`
+        BindingType      string   `form:"binding_type"`
     }
 
     id := c.Param("id")
@@ -342,6 +370,7 @@ func (h *BookHandler) UpdateBook(c *gin.Context) {
         return
     }
 
+    // Lấy sách từ DB
     var book models.Book
     if err := h.DB.First(&book, bookID).Error; err != nil {
         if gorm.IsRecordNotFoundError(err) {
@@ -352,19 +381,20 @@ func (h *BookHandler) UpdateBook(c *gin.Context) {
         return
     }
 
-    if err := c.ShouldBindJSON(&requestData); err != nil {
-        fmt.Printf("Error binding JSON: %s\n", err.Error())
-        c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Error binding JSON: %s", err.Error())})
+    // Bind dữ liệu form
+    if err := c.ShouldBind(&requestData); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Error binding form: %s", err.Error())})
         return
     }
 
+    // Kiểm tra tiêu đề sách
     if strings.TrimSpace(requestData.Title) == "" {
         errMsg := "Book title is required"
-        fmt.Printf("%s\n", errMsg)
         c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
         return
     }
 
+    // Kiểm tra tác giả
     var author models.Author
     if err := h.DB.First(&author, requestData.AuthorID).Error; err != nil {
         if gorm.IsRecordNotFoundError(err) {
@@ -375,57 +405,222 @@ func (h *BookHandler) UpdateBook(c *gin.Context) {
         return
     }
 
+    // Xóa các thể loại cũ (nếu có)
     if err := h.DB.Where("book_id = ?", book.ID).Delete(&models.BookCategory{}).Error; err != nil {
-        fmt.Printf("Error manually clearing categories: %v\n", err)
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to manually clear categories"})
         return
     }
 
+    // Xóa BookDetail và các hình ảnh cũ
+    if err := h.DB.Where("book_id = ?", book.ID).Delete(&models.BookDetail{}).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete old BookDetail"})
+        return
+    }
+
+    if err := h.DB.Where("book_id = ?", book.ID).Delete(&models.BookImage{}).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete old images"})
+        return
+    }
+
+    // Cập nhật thông tin sách từ requestData
     book.Title = requestData.Title
     book.Description = requestData.Description
     book.Price = float64(requestData.Price)
     book.QuantityInStock = requestData.QuantityInStock
     book.AuthorID = requestData.AuthorID
 
+    // Cập nhật thể loại sách
     if len(requestData.CategoryIDs) > 0 {
         var categories []models.Category
         if err := h.DB.Find(&categories, "id IN (?)", requestData.CategoryIDs).Error; err != nil {
-            fmt.Printf("Error finding categories: %v\n", err)
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find categories"})
             return
         }
-		// if err := h.DB.Model(&book).Association("Categories").Append(categories); err != nil {
-        //     fmt.Printf("Error updating categories: %v\n", err)
-        //     c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update categories"})
-        //     return
-        // }
-        // Insert new relationships into the book_categories join table
+
         for _, category := range categories {
             bookCategory := models.BookCategory{
                 BookID:     book.ID,
                 CategoryID: category.ID,
             }
             if err := h.DB.Create(&bookCategory).Error; err != nil {
-                fmt.Printf("Error creating book-category relationship: %v\n", err)
                 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update categories"})
                 return
             }
         }
     } else {
         errMsg := "At least one category is required"
-        fmt.Printf("%s\n", errMsg)
         c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
         return
     }
 
-    if err := h.DB.Preload("Author").Preload("Categories").Save(&book).Error; err != nil {
-        fmt.Printf("Error updating book in DB: %v\n", err)
+    // Cập nhật BookDetail
+    bookDetail := models.BookDetail{
+        Publisher:       requestData.Publisher,
+        PublicationYear: requestData.PublicationYear,
+        Weight:          requestData.Weight,
+        Dimensions:      requestData.Dimensions,
+        Pages:           requestData.Pages,
+        BindingType:     requestData.BindingType,
+    }
+
+    // Lưu BookDetail
+    bookDetail.BookID = book.ID
+    if err := h.DB.Create(&bookDetail).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save BookDetail"})
+        return
+    }
+
+    // Xử lý hình ảnh (nếu có)
+    var imageURLs []string
+    form, err := c.MultipartForm()
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to process multipart form"})
+        return
+    }
+
+    files := form.File["images"]
+    for _, file := range files {
+        fileContent, err := file.Open()
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open image file"})
+            return
+        }
+        defer fileContent.Close()
+
+        // Upload ảnh lên Cloudinary
+        imageURL, err := utils.UploadImageToCloudinary(fileContent)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload image"})
+            return
+        }
+
+        imageURLs = append(imageURLs, imageURL)
+    }
+
+    // Lưu hình ảnh mới vào cơ sở dữ liệu
+    for _, url := range imageURLs {
+        image := models.BookImage{
+            URL:    url,
+            BookID: book.ID,
+        }
+        if err := h.DB.Create(&image).Error; err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save image"})
+            return
+        }
+    }
+
+    // Cập nhật thông tin sách sau khi tất cả đã được xử lý
+    if err := h.DB.Preload("Author").Preload("Images").Preload("BookDetail").Save(&book).Error; err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update book"})
         return
     }
 
-    c.JSON(http.StatusOK, book)
+    // Trả về thông tin sách đã cập nhật
+    c.JSON(http.StatusOK, gin.H{"book": book, "images": imageURLs})
 }
+
+
+// func (h *BookHandler) UpdateBook(c *gin.Context) {
+//     var requestData struct {
+//         Title            string   `json:"title"`
+//         Price            uint     `json:"price"`
+//         QuantityInStock  uint     `json:"quantity"`
+//         Description      string   `json:"description"`
+//         AuthorID         uint     `json:"author_id"`
+//         CategoryIDs      []uint   `json:"categories"` 
+//     }
+
+//     id := c.Param("id")
+//     bookID, err := strconv.Atoi(id)
+//     if err != nil {
+//         c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid book ID"})
+//         return
+//     }
+
+//     var book models.Book
+//     if err := h.DB.First(&book, bookID).Error; err != nil {
+//         if gorm.IsRecordNotFoundError(err) {
+//             c.JSON(http.StatusNotFound, gin.H{"error": "Book not found"})
+//         } else {
+//             c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve book"})
+//         }
+//         return
+//     }
+
+//     if err := c.ShouldBindJSON(&requestData); err != nil {
+//         fmt.Printf("Error binding JSON: %s\n", err.Error())
+//         c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Error binding JSON: %s", err.Error())})
+//         return
+//     }
+
+//     if strings.TrimSpace(requestData.Title) == "" {
+//         errMsg := "Book title is required"
+//         fmt.Printf("%s\n", errMsg)
+//         c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
+//         return
+//     }
+
+//     var author models.Author
+//     if err := h.DB.First(&author, requestData.AuthorID).Error; err != nil {
+//         if gorm.IsRecordNotFoundError(err) {
+//             c.JSON(http.StatusBadRequest, gin.H{"error": "Author not found"})
+//         } else {
+//             c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate author"})
+//         }
+//         return
+//     }
+
+//     if err := h.DB.Where("book_id = ?", book.ID).Delete(&models.BookCategory{}).Error; err != nil {
+//         fmt.Printf("Error manually clearing categories: %v\n", err)
+//         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to manually clear categories"})
+//         return
+//     }
+
+//     book.Title = requestData.Title
+//     book.Description = requestData.Description
+//     book.Price = float64(requestData.Price)
+//     book.QuantityInStock = requestData.QuantityInStock
+//     book.AuthorID = requestData.AuthorID
+
+//     if len(requestData.CategoryIDs) > 0 {
+//         var categories []models.Category
+//         if err := h.DB.Find(&categories, "id IN (?)", requestData.CategoryIDs).Error; err != nil {
+//             fmt.Printf("Error finding categories: %v\n", err)
+//             c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find categories"})
+//             return
+//         }
+// 		// if err := h.DB.Model(&book).Association("Categories").Append(categories); err != nil {
+//         //     fmt.Printf("Error updating categories: %v\n", err)
+//         //     c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update categories"})
+//         //     return
+//         // }
+//         // Insert new relationships into the book_categories join table
+//         for _, category := range categories {
+//             bookCategory := models.BookCategory{
+//                 BookID:     book.ID,
+//                 CategoryID: category.ID,
+//             }
+//             if err := h.DB.Create(&bookCategory).Error; err != nil {
+//                 fmt.Printf("Error creating book-category relationship: %v\n", err)
+//                 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update categories"})
+//                 return
+//             }
+//         }
+//     } else {
+//         errMsg := "At least one category is required"
+//         fmt.Printf("%s\n", errMsg)
+//         c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
+//         return
+//     }
+
+//     if err := h.DB.Preload("Author").Preload("Categories").Save(&book).Error; err != nil {
+//         fmt.Printf("Error updating book in DB: %v\n", err)
+//         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update book"})
+//         return
+//     }
+
+//     c.JSON(http.StatusOK, book)
+// }
 
 
 
