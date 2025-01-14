@@ -7,7 +7,7 @@ import (
 )
 
 // SetupRoutes đăng ký tất cả các route cho API, bao gồm cả xác thực
-func SetupRoutes(router *gin.Engine,categoryHandler *handlers.CategoryHandler,adminTransactionHandler *admin.AdminTransactionHandler, transactionHandler *handlers.TransactionHandler, purchaseHandler *handlers.PurchaseHandler, userHandler *handlers.UserHandler, authorHandler *handlers.AuthorHandler, bookHandler *handlers.BookHandler, authHandler *handlers.AuthHandler) {
+func SetupRoutes(router *gin.Engine,favoriteBookHandler *handlers.FavoriteBookHandler, categoryHandler *handlers.CategoryHandler,adminTransactionHandler *admin.AdminTransactionHandler, transactionHandler *handlers.TransactionHandler, purchaseHandler *handlers.PurchaseHandler, userHandler *handlers.UserHandler, authorHandler *handlers.AuthorHandler, bookHandler *handlers.BookHandler, authHandler *handlers.AuthHandler) {
 	AuthorRoutes(router, authorHandler)
 
 	BookRoutes(router, bookHandler)
@@ -17,4 +17,5 @@ func SetupRoutes(router *gin.Engine,categoryHandler *handlers.CategoryHandler,ad
 	PurchaseRoutes(router, purchaseHandler)
 	TransactionRoutes(router, transactionHandler)
 	AdminRoutes(router, adminTransactionHandler)
+	FavoriteBookRoutes(router, favoriteBookHandler)
 }
