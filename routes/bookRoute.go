@@ -2,12 +2,14 @@ package routes
 
 import (
 	"shop-account/handlers"
+	"shop-account/middlewares"
 	"github.com/gin-gonic/gin"
 )
 
 // BookRoutes đăng ký các route cho sách
 func BookRoutes(router *gin.Engine, bookHandler *handlers.BookHandler) {
 	bookGroup := router.Group("/books")
+	bookGroup.Use(middlewares.SetUserIDMiddleware())
 	{
 		bookGroup.GET("/", bookHandler.GetBooks)
 		bookGroup.GET("/:id", bookHandler.GetBookByID)
