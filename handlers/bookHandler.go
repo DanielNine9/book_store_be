@@ -337,6 +337,7 @@ func (h *BookHandler) GetBookByID(c *gin.Context) {
 		Price:       book.Price,
 		Author:      book.Author,
 		Categories:  book.Categories,
+		QuantityInStock: book.QuantityInStock,
 		BookDetail:  book.BookDetail,
 		Images:  book.Images,
 		IsFavorite:  isFavorite,
