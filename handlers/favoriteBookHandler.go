@@ -128,7 +128,7 @@ func (h *FavoriteBookHandler) GetUserFavoriteBooks(c *gin.Context) {
 	userID := uint(userIDFloat)
 
 	var favoriteBooks []models.FavoriteBook
-	if err := h.DB.Preload("Book").Where("user_id = ?", userID).Find(&favoriteBooks).Error; err != nil {
+	if err := h.DB.Preload("Book").Preload("Book.Images").Preload("Book.Author").Preload("Book.BookDetail").Where("user_id = ?", userID).Find(&favoriteBooks).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve favorite books"})
 		return
 	}
