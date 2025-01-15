@@ -73,6 +73,7 @@ func (h *BookHandler) GetBooks(c *gin.Context) {
 				QuantitySold:      book.QuantitySold,
 				Categories:  book.Categories,
 				BookDetail:  book.BookDetail,
+				Images:  book.Images,
 				Active: book.Active,
 				IsFavorite:  false,
 				IdFavorite:  0,
@@ -123,10 +124,11 @@ func (h *BookHandler) GetBooks(c *gin.Context) {
 			Categories:  book.Categories,
 			BookDetail:  book.BookDetail,
 			Active: book.Active,
+			Images:  book.Images,
 			QuantityInStock:   book.QuantityInStock,
 			QuantitySold:      book.QuantitySold,
 			IsFavorite:  isFavorite,
-			IdFavorite:  favoriteIDValue, // Set the ID of the favorite (or 0 if not found)
+			IdFavorite:  favoriteIDValue, 
 		}
 
 		bookResponses = append(bookResponses, bookResponse)
@@ -344,7 +346,7 @@ func (h *BookHandler) GetBookByID(c *gin.Context) {
 	fmt.Printf("%v" , bookResponse)
 
 	// Return the response
-	c.JSON(http.StatusOK, book)
+	c.JSON(http.StatusOK, bookResponse)
 }
 
 func (h *BookHandler) UpdateBook(c *gin.Context) {
@@ -372,7 +374,7 @@ func (h *BookHandler) UpdateBook(c *gin.Context) {
 
     // Lấy sách từ DB
     var book models.Book
-    if err := h.DB.First(&book, bookID).Error; err != nil {
+    if err := h.DB.Preload("Author").Preload("Images").Preload("BookDetail").First(&book, bookID).Error; err != nil {
         if gorm.IsRecordNotFoundError(err) {
             c.JSON(http.StatusNotFound, gin.H{"error": "Book not found"})
         } else {
@@ -510,7 +512,7 @@ func (h *BookHandler) UpdateBook(c *gin.Context) {
     }
 
     // Cập nhật thông tin sách sau khi tất cả đã được xử lý
-    if err := h.DB.Preload("Author").Preload("Images").Preload("BookDetail").Save(&book).Error; err != nil {
+    if err := h.DB.Save(&book).Error; err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update book"})
         return
     }
