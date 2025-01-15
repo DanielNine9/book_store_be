@@ -13,6 +13,8 @@ import (
 type TransactionHandler struct {
 	DB *gorm.DB
 }
+
+
 func (h *TransactionHandler) CreateTransaction(c *gin.Context) {
 	userIDInterface, exists := c.Get("user_id")
 	if !exists {
