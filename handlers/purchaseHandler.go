@@ -167,8 +167,8 @@ func (h *PurchaseHandler) GetUserPurchases(c *gin.Context) {
     var purchases []models.Purchase
 
     // Preload related data and filter by user_id
-    query := h.DB.Preload("Book").Preload("User").Preload("Transaction").Where("user_id = ?", userID)
-
+    // query := h.DB.Preload("Book").Preload("Book.Images").Preload("User").Preload("Transaction").Where("user_id = ?", userID)
+    query := h.DB.Preload("Book").Preload("Book.Images").Preload("User").Preload("Transaction").Where("user_id = ? AND transaction_id = 0", userID)
     // Call PaginateAndSearch utility to fetch paginated data with dynamic search (if any)
     totalItems, page, totalPages, err := utils.PaginateAndSearch(c, query, &models.Purchase{}, &purchases, nil)
     if err != nil {
