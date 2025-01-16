@@ -54,7 +54,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	// Set default role for the new user
 	user.Role = "guest" // Default role, can be changed based on your application's logic
-
+	user.Active = true
 	// Save the user to the database
 	if err := h.DB.Create(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user"})
