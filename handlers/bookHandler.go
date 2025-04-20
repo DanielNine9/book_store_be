@@ -1,17 +1,16 @@
 package handlers
 
 import (
-	"fmt"
-	"log"
-	"net/http"
-	"shop-account/dtos"
 	"shop-account/models"
 	"shop-account/utils"
-	"strconv"
-	"strings"
-
+	"shop-account/dtos"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
+	"net/http"
+	"strconv"
+	"strings"
+	"fmt"
+	"log"
 )
 
 // Handler struct để lưu trữ db instance
@@ -136,81 +135,83 @@ func (h *BookHandler) GetBooks(c *gin.Context) {
 	})
 }
 
+
+
+
 func (h *BookHandler) CreateBook(c *gin.Context) {
-	var requestData struct {
-		Title           string `json:"title"`
-		Price           uint   `json:"price"`
-		QuantityInStock uint   `json:"quantity"`
-		Description     string `json:"description"`
-		AuthorID        uint   `json:"author_id"`
-		CategoryIDs     []uint `json:"categories"`
-	}
+    var requestData struct {
+        Title       string   `json:"title"`
+		Price       uint   `json:"price"`
+		QuantityInStock       uint   `json:"quantity"`
+        Description string   `json:"description"`
+        AuthorID    uint     `json:"author_id"`
+        CategoryIDs []uint   `json:"categories"`
+    }
 
-	if err := c.ShouldBindJSON(&requestData); err != nil {
-		fmt.Printf("Error binding JSON: %s\n", err.Error())
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Error binding JSON: %s", err.Error())})
-		return
-	}
+    if err := c.ShouldBindJSON(&requestData); err != nil {
+        fmt.Printf("Error binding JSON: %s\n", err.Error())
+        c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Error binding JSON: %s", err.Error())})
+        return
+    }
 
-	if strings.TrimSpace(requestData.Title) == "" {
-		errMsg := "Book title is required"
-		fmt.Printf("%s\n", errMsg)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
-		return
-	}
+    if strings.TrimSpace(requestData.Title) == "" {
+        errMsg := "Book title is required"
+        fmt.Printf("%s\n", errMsg)
+        c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
+        return
+    }
 
-	var author models.Author
-	if err := h.DB.First(&author, requestData.AuthorID).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Author not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate author"})
-		}
-		return
-	}
+    var author models.Author
+    if err := h.DB.First(&author, requestData.AuthorID).Error; err != nil {
+        if gorm.IsRecordNotFoundError(err) {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Author not found"})
+        } else {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate author"})
+        }
+        return
+    }
 
-	code, err := utils.GenerateCode(h.DB, &models.Book{})
-	if err != nil {
-		fmt.Printf("Error generating book code: %s\n", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to generate book code: %s", err.Error())})
-		return
-	}
+    code, err := utils.GenerateCode(h.DB, &models.Book{})
+    if err != nil {
+        fmt.Printf("Error generating book code: %s\n", err.Error())
+        c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to generate book code: %s", err.Error())})
+        return
+    }
 
-	book := models.Book{
-		Title:           requestData.Title,
-		Description:     requestData.Description,
-		AuthorID:        requestData.AuthorID,
-		Price:           float64(requestData.Price),
-		QuantityInStock: requestData.QuantityInStock,
-		Code:            code,
-		Active:          true,
-	}
+    book := models.Book{
+        Title:       requestData.Title,
+        Description: requestData.Description,
+        AuthorID:    requestData.AuthorID,
+        Price:    float64(requestData.Price),
+        QuantityInStock:    requestData.QuantityInStock,
+        Code:        code,
+        Active:      true,
+    }
 
-	if len(requestData.CategoryIDs) > 0 {
-		var categories []models.Category
-		if err := h.DB.Find(&categories, "id IN (?)", requestData.CategoryIDs).Error; err != nil {
-			fmt.Printf("Error finding categories: %s\n", err.Error())
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find categories"})
-			return
-		}
+    if len(requestData.CategoryIDs) > 0 {
+        var categories []models.Category
+        if err := h.DB.Find(&categories, "id IN (?)", requestData.CategoryIDs).Error; err != nil {
+            fmt.Printf("Error finding categories: %s\n", err.Error())
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find categories"})
+            return
+        }
 
-		book.Categories = categories
-	} else {
-		errMsg := "At least one category is required"
-		fmt.Printf("%s\n", errMsg)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
-		return
-	}
+        book.Categories = categories
+    } else {
+        errMsg := "At least one category is required"
+        fmt.Printf("%s\n", errMsg)
+        c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
+        return
+    }
 
-	if err := h.DB.Preload("Author").Preload("Categories").Create(&book).Error; err != nil {
-		fmt.Printf("Error creating book in DB: %s\n", err.Error())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create book in DB: %s", err.Error())})
-		return
-	}
+    if err := h.DB.Preload("Author").Preload("Categories").Create(&book).Error; err != nil {
+        fmt.Printf("Error creating book in DB: %s\n", err.Error())
+        c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create book in DB: %s", err.Error())})
+        return
+    }
 
-	c.JSON(http.StatusCreated, book)
+    c.JSON(http.StatusCreated, book)
 }
-
 func (h *BookHandler) GetBookByID(c *gin.Context) {
 	id := c.Param("id")
 	bookID, err := strconv.Atoi(id)
@@ -251,122 +252,125 @@ func (h *BookHandler) GetBookByID(c *gin.Context) {
 
 	// Prepare the response struct
 	bookResponse := dtos.BookResponse{
-		ID:              book.ID,
-		Title:           book.Title,
-		Description:     book.Description,
-		Price:           book.Price,
-		Author:          book.Author,
-		Categories:      book.Categories,
-		IsFavorite:      isFavorite,
-		IdFavorite:      favoriteID,
-		QuantityInStock: book.QuantityInStock,
+		ID:          book.ID,
+		Title:       book.Title,
+		Description: book.Description,
+		Price:       book.Price,
+		Author:      book.Author,
+		Categories:  book.Categories,
+		IsFavorite:  isFavorite,
+		IdFavorite:  favoriteID, // The ID of the favorite or 0 if not a favorite
 	}
 
 	// Return the response
 	c.JSON(http.StatusOK, bookResponse)
 }
 
+
 func (h *BookHandler) UpdateBook(c *gin.Context) {
-	var requestData struct {
-		Title           string `json:"title"`
-		Price           uint   `json:"price"`
-		QuantityInStock uint   `json:"quantity"`
-		Description     string `json:"description"`
-		AuthorID        uint   `json:"author_id"`
-		CategoryIDs     []uint `json:"categories"`
-	}
+    var requestData struct {
+        Title            string   `json:"title"`
+        Price            uint     `json:"price"`
+        QuantityInStock  uint     `json:"quantity"`
+        Description      string   `json:"description"`
+        AuthorID         uint     `json:"author_id"`
+        CategoryIDs      []uint   `json:"categories"` 
+    }
 
-	id := c.Param("id")
-	bookID, err := strconv.Atoi(id)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid book ID"})
-		return
-	}
+    id := c.Param("id")
+    bookID, err := strconv.Atoi(id)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid book ID"})
+        return
+    }
 
-	var book models.Book
-	if err := h.DB.First(&book, bookID).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Book not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve book"})
-		}
-		return
-	}
+    var book models.Book
+    if err := h.DB.First(&book, bookID).Error; err != nil {
+        if gorm.IsRecordNotFoundError(err) {
+            c.JSON(http.StatusNotFound, gin.H{"error": "Book not found"})
+        } else {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve book"})
+        }
+        return
+    }
 
-	if err := c.ShouldBindJSON(&requestData); err != nil {
-		fmt.Printf("Error binding JSON: %s\n", err.Error())
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Error binding JSON: %s", err.Error())})
-		return
-	}
+    if err := c.ShouldBindJSON(&requestData); err != nil {
+        fmt.Printf("Error binding JSON: %s\n", err.Error())
+        c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Error binding JSON: %s", err.Error())})
+        return
+    }
 
-	if strings.TrimSpace(requestData.Title) == "" {
-		errMsg := "Book title is required"
-		fmt.Printf("%s\n", errMsg)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
-		return
-	}
+    if strings.TrimSpace(requestData.Title) == "" {
+        errMsg := "Book title is required"
+        fmt.Printf("%s\n", errMsg)
+        c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
+        return
+    }
 
-	var author models.Author
-	if err := h.DB.First(&author, requestData.AuthorID).Error; err != nil {
-		if gorm.IsRecordNotFoundError(err) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Author not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate author"})
-		}
-		return
-	}
+    var author models.Author
+    if err := h.DB.First(&author, requestData.AuthorID).Error; err != nil {
+        if gorm.IsRecordNotFoundError(err) {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Author not found"})
+        } else {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate author"})
+        }
+        return
+    }
 
-	if err := h.DB.Where("book_id = ?", book.ID).Delete(&models.BookCategory{}).Error; err != nil {
-		fmt.Printf("Error manually clearing categories: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to manually clear categories"})
-		return
-	}
+    if err := h.DB.Where("book_id = ?", book.ID).Delete(&models.BookCategory{}).Error; err != nil {
+        fmt.Printf("Error manually clearing categories: %v\n", err)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to manually clear categories"})
+        return
+    }
 
-	book.Title = requestData.Title
-	book.Description = requestData.Description
-	book.Price = float64(requestData.Price)
-	book.QuantityInStock = requestData.QuantityInStock
-	book.AuthorID = requestData.AuthorID
+    book.Title = requestData.Title
+    book.Description = requestData.Description
+    book.Price = float64(requestData.Price)
+    book.QuantityInStock = requestData.QuantityInStock
+    book.AuthorID = requestData.AuthorID
 
-	if len(requestData.CategoryIDs) > 0 {
-		var categories []models.Category
-		if err := h.DB.Find(&categories, "id IN (?)", requestData.CategoryIDs).Error; err != nil {
-			fmt.Printf("Error finding categories: %v\n", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find categories"})
-			return
-		}
+    if len(requestData.CategoryIDs) > 0 {
+        var categories []models.Category
+        if err := h.DB.Find(&categories, "id IN (?)", requestData.CategoryIDs).Error; err != nil {
+            fmt.Printf("Error finding categories: %v\n", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to find categories"})
+            return
+        }
 		// if err := h.DB.Model(&book).Association("Categories").Append(categories); err != nil {
-		//     fmt.Printf("Error updating categories: %v\n", err)
-		//     c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update categories"})
-		//     return
-		// }
-		// Insert new relationships into the book_categories join table
-		for _, category := range categories {
-			bookCategory := models.BookCategory{
-				BookID:     book.ID,
-				CategoryID: category.ID,
-			}
-			if err := h.DB.Create(&bookCategory).Error; err != nil {
-				fmt.Printf("Error creating book-category relationship: %v\n", err)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update categories"})
-				return
-			}
-		}
-	} else {
-		errMsg := "At least one category is required"
-		fmt.Printf("%s\n", errMsg)
-		c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
-		return
-	}
+        //     fmt.Printf("Error updating categories: %v\n", err)
+        //     c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update categories"})
+        //     return
+        // }
+        // Insert new relationships into the book_categories join table
+        for _, category := range categories {
+            bookCategory := models.BookCategory{
+                BookID:     book.ID,
+                CategoryID: category.ID,
+            }
+            if err := h.DB.Create(&bookCategory).Error; err != nil {
+                fmt.Printf("Error creating book-category relationship: %v\n", err)
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update categories"})
+                return
+            }
+        }
+    } else {
+        errMsg := "At least one category is required"
+        fmt.Printf("%s\n", errMsg)
+        c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
+        return
+    }
 
-	if err := h.DB.Preload("Author").Preload("Categories").Save(&book).Error; err != nil {
-		fmt.Printf("Error updating book in DB: %v\n", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update book"})
-		return
-	}
+    if err := h.DB.Preload("Author").Preload("Categories").Save(&book).Error; err != nil {
+        fmt.Printf("Error updating book in DB: %v\n", err)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update book"})
+        return
+    }
 
-	c.JSON(http.StatusOK, book)
+    c.JSON(http.StatusOK, book)
 }
+
+
+
 
 func (h *BookHandler) DeleteBook(c *gin.Context) {
 	id := c.Param("id")
@@ -391,7 +395,7 @@ func (h *BookHandler) DeleteBook(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusNoContent, nil)
+	c.JSON(http.StatusNoContent, nil) 
 }
 
 func (h *BookHandler) PatchBook(c *gin.Context) {
@@ -429,6 +433,7 @@ func (h *BookHandler) PatchBook(c *gin.Context) {
 			return
 		}
 	}
+	
 
 	if updatedBook.Title != "" {
 		book.Title = updatedBook.Title
@@ -442,7 +447,7 @@ func (h *BookHandler) PatchBook(c *gin.Context) {
 	if updatedBook.QuantityInStock != 0 {
 		book.QuantityInStock = updatedBook.QuantityInStock
 	}
-
+		
 	book.Active = updatedBook.Active
 
 	if err := h.DB.Save(&book).Error; err != nil {
@@ -452,7 +457,6 @@ func (h *BookHandler) PatchBook(c *gin.Context) {
 
 	c.JSON(http.StatusOK, book)
 }
-
 type BookResult struct {
 	Books []models.Book
 	Err   error
@@ -470,13 +474,13 @@ func (h *BookHandler) GetBooksConcurrently(c *gin.Context) {
 	go func() {
 		var books []models.Book
 		err := h.DB.Preload("Author").Find(&books).Error
-		bookResultChan <- BookResult{Books: books, Err: err}
+		bookResultChan <- BookResult{Books: books, Err: err} 
 	}()
 
 	go func() {
 		var authors []models.Author
 		err := h.DB.Find(&authors).Error
-		authorResultChan <- AuthorResult{Authors: authors, Err: err}
+		authorResultChan <- AuthorResult{Authors: authors, Err: err} 
 	}()
 
 	var books []models.Book
@@ -489,13 +493,13 @@ func (h *BookHandler) GetBooksConcurrently(c *gin.Context) {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to retrieve books: %v", result.Err)})
 				return
 			}
-			books = result.Books
+			books = result.Books 
 		case result := <-authorResultChan:
 			if result.Err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to retrieve authors: %v", result.Err)})
 				return
 			}
-			authors = result.Authors
+			authors = result.Authors 
 		}
 	}
 
@@ -505,6 +509,7 @@ func (h *BookHandler) GetBooksConcurrently(c *gin.Context) {
 	})
 }
 
+
 func (h *BookHandler) GetBooksNotConcurrently(c *gin.Context) {
 	var books []models.Book
 	if err := h.DB.Preload("Author").Find(&books).Error; err != nil {
@@ -513,9 +518,10 @@ func (h *BookHandler) GetBooksNotConcurrently(c *gin.Context) {
 	}
 	var authors []models.Author
 	h.DB.Preload("Books").Find(&authors)
-
+	
 	c.JSON(http.StatusOK, gin.H{"books": books, "authors": authors})
 }
+
 
 func (h *BookHandler) ImportBooks(c *gin.Context) {
 	var author models.Author
@@ -529,7 +535,7 @@ func (h *BookHandler) ImportBooks(c *gin.Context) {
 		book := models.Book{
 			Title:       fmt.Sprintf("Book Title %d", i),
 			Description: fmt.Sprintf("Description for Book %d", i),
-			AuthorID:    author.ID,
+			AuthorID:    author.ID, 
 		}
 		books = append(books, book)
 	}
@@ -541,7 +547,8 @@ func (h *BookHandler) ImportBooks(c *gin.Context) {
 		return
 	}
 
-	for _, book := range books {
+	
+		for _, book := range books {
 		if err := h.DB.Create(&book).Error; err != nil {
 			log.Printf("Error importing book: %+v. Error: %v", book, err)
 			continue
@@ -555,23 +562,25 @@ func (h *BookHandler) ImportBooks(c *gin.Context) {
 }
 
 func (h *BookHandler) Restore(c *gin.Context) {
-	id := c.Param("id")
-	var book models.Book
+    id := c.Param("id")
+    var book models.Book
 
-	if err := h.DB.Unscoped().Where("id = ?", id).First(&book).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Book not found"})
-		return
-	}
+    if err := h.DB.Unscoped().Where("id = ?", id).First(&book).Error; err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Book not found"})
+        return
+    }
 
-	if book.DeletedAt == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Book is not deleted"})
-		return
-	}
+    if book.DeletedAt == nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Book is not deleted"})
+        return
+    }
 
-	if err := h.DB.Model(&book).Update("deleted_at", nil).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to restore book"})
-		return
-	}
+    if err := h.DB.Model(&book).Update("deleted_at", nil).Error; err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to restore book"})
+        return
+    }
 
-	c.JSON(http.StatusOK, gin.H{"message": "Book restored successfully"})
+    c.JSON(http.StatusOK, gin.H{"message": "Book restored successfully"})
 }
+
+
